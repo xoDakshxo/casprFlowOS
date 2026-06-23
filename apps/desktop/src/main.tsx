@@ -1,10 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import "@xterm/xterm/css/xterm.css";
 import "@casprflowos/ui/tokens.css";
+import "./casprflow/index.css";
 import "./styles.css";
 import { App } from "./App";
+import { ErrorBoundary } from "./casprflow/components/ErrorBoundary";
+import "./casprflow/monacoEnvironment";
+import "./casprflow/scrollFade";
 
 const rootElement = document.querySelector("#root");
 
@@ -14,6 +17,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

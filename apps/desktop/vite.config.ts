@@ -1,4 +1,5 @@
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { build as esbuild, context as esbuildContext, type BuildOptions } from "esbuild";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,6 +38,7 @@ const buildPreload = (): Plugin => {
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     buildPreload(),
     electron([
       {
