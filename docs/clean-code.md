@@ -121,8 +121,12 @@ apps/desktop← may import any package; nothing imports it
 
 ## Commits / PRs
 
-- Small, reviewable, one concern per PR. A phase is many PRs, not one mega-commit.
-- Each PR states which phase + checklist item it advances (see `implementation/`).
+- Work in small, reviewable slices while implementing a phase, but keep those slices
+  uncommitted until the phase is complete.
+- Commit only after the current phase exit criterion is green, the app has been run, the
+  user has received validation steps, and the user explicitly approves staging/commit.
+- The completed-phase commit states which phase it completes or advances (see
+  `implementation/`).
 - Green typecheck + lint + tests before merge. No "fix later" TODOs without a linked issue.
 
 ## The "would I be proud of this" bar

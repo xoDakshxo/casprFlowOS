@@ -38,6 +38,45 @@ export interface CapabilityResult<TData extends JsonObject = JsonObject> {
   readonly data: TData;
 }
 
+export interface CanvasPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface CanvasSize {
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface CanvasViewport extends CanvasPoint {
+  readonly zoom: number;
+}
+
+export type CanvasWindowStatus = "idle" | "running" | "waiting" | "done" | "error";
+
+export interface CanvasWindowSummary {
+  readonly id: Id<"window">;
+  readonly callsign: string;
+  readonly agentLabel: string;
+  readonly projectId: Id<"project">;
+  readonly worktreeId: Id<"worktree">;
+  readonly position: CanvasPoint;
+  readonly size: CanvasSize;
+  readonly focused: boolean;
+  readonly minimized: boolean;
+  readonly status: CanvasWindowStatus;
+}
+
+export type CanvasZoomMode = "in" | "out" | "fit" | "reset";
+
+export interface CanvasPort {
+  readonly listWindows: () => readonly CanvasWindowSummary[];
+  readonly getFocusedWindow: () => CanvasWindowSummary | null;
+  readonly focusWindow: (windowId: Id<"window">) => Promise<CapabilityResult>;
+  readonly panZoom: (mode: CanvasZoomMode) => Promise<CapabilityResult>;
+  readonly arrange: () => Promise<CapabilityResult>;
+}
+
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface LogEntry {

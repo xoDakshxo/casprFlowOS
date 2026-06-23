@@ -11,7 +11,7 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 | # | Phase | Status | Exit criterion met? | Notes |
 |---|---|---|---|---|
 | 0 | [Foundations](phase-0-foundations.md) | ✅ | ✅ | `pnpm dev` boots a dark glass window; `pnpm verify` green |
-| 1 | [Cleanup & extract core](phase-1-cleanup-extract.md) | ⬜ | — | canvas + pty terminals + whole project/code panel; fluff deleted |
+| 1 | [Cleanup & extract core](phase-1-cleanup-extract.md) | 🟡 | — | CanvasPort + pure canvas-core scene slice started; pty/panel pending |
 | 2 | [Rebrand](phase-2-rebrand.md) | ⬜ | — | no `termcanvas` strings; casprFlow logo + name |
 | 3 | [Design system & glass](phase-3-design-glass.md) | ⬜ | — | glass UI, translucent terminals, canvas themes |
 | 4 | [Rails](phase-4-rails.md) | ⬜ | — | left work rail + right OS rail; favourite project opens on launch |
@@ -22,8 +22,8 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 | 9 | [OS surfaces & MCP](phase-9-os-mcp.md) | ⬜ | — | connectors + Spotify surface; automations/skills/profiles |
 | 10 | [Polish & latency](phase-10-polish.md) | ⬜ | — | taste + latency budget + shippable build |
 
-**Current phase:** Phase 0 — Foundations
-**Last updated:** 2026-06-23
+**Current phase:** Phase 1 — Cleanup & extract core
+**Last updated:** 2026-06-24
 
 ---
 

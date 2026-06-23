@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import "@xterm/xterm/css/xterm.css";
 import "@casprflowos/ui/tokens.css";
 import "./styles.css";
 import { App } from "./App";

@@ -6,5 +6,9 @@
     "types": ["node", "vite/client"]
   },
   "include": ["electron/**/*.ts", "src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
-  "references": [{ "path": "../../packages/shared" }, { "path": "../../packages/ui" }]
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/canvas-core" },
+    { "path": "../../packages/ui" }
+  ]
 }

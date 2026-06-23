@@ -45,7 +45,7 @@ export default defineConfig({
           build: {
             outDir: "dist-electron",
             rollupOptions: {
-              external: ["electron"],
+              external: ["electron", "node-pty"],
             },
           },
         },
@@ -62,6 +62,10 @@ export default defineConfig({
       {
         find: /^@casprflowos\/shared$/,
         replacement: path.resolve(workspaceRoot, "packages/shared/src/index.ts"),
+      },
+      {
+        find: /^@casprflowos\/canvas-core$/,
+        replacement: path.resolve(workspaceRoot, "packages/canvas-core/src/index.ts"),
       },
       {
         find: /^@casprflowos\/ui$/,

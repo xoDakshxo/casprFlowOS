@@ -16,6 +16,7 @@
     "lint:css": "stylelint \"**/*.css\" --max-warnings 0",
     "test": "pnpm -r --sort test",
     "verify": "pnpm typecheck && pnpm lint && pnpm lint:css && pnpm test",
+    "postinstall": "node scripts/postinstall.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,css,md,json}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,css,md,json}\""
   },

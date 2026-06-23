@@ -67,9 +67,12 @@ UI here keeps regressing. Two layers govern all visual work:
 
 
 
+## How to work
+
 - Go **phase by phase, in order**. Don't start a phase until the previous phase's exit
   criterion is green **and verified by running the app** (not just typecheck).
-- Each phase is **many small commits**, each advancing one checklist item.
+- Work in small, reviewable slices, each advancing one checklist item, but keep them
+  uncommitted until the **entire current phase** is complete.
 - **Update `docs/implementation/TRACKER.md`** when you start/finish a phase or check off an
   item. It is the live status of the build.
 - When you finish a phase, **stop and report** the exit-criterion result before starting
@@ -77,6 +80,20 @@ UI here keeps regressing. Two layers govern all visual work:
 - **Start with Phase 0** (`docs/implementation/phase-0-foundations.md`): `pnpm install &&
   pnpm dev` opens a dark glass Electron window showing the casprFlowOS logo + name, with
   `pnpm verify` (typecheck + lint + test) green. No TermCanvas code yet.
+
+## Commit gate (phase-complete only, user approval required)
+
+Do **not** commit partial phase slices. Before staging or committing any work:
+
+- Run the relevant verification commands (`pnpm verify`, plus `pnpm build` when build
+  wiring or app/runtime code changed).
+- Run the application with `pnpm dev` and verify the **full current phase exit criterion**
+  in the actual UI, not just in tests.
+- Give the user concise, phase-specific validation steps they can run manually.
+- Ask the user for explicit approval to stage/commit only after the phase is complete, and
+  do not run `git add` or `git commit` until they approve.
+- If the user rejects or interrupts approval, leave the working tree uncommitted and report
+  what remains pending.
 
 ## Git (the user's setup — respect it)
 

@@ -1,35 +1,629 @@
+:root {
+  /* App-shell chrome dimensions (fixed structural chrome — defined as tokens
+     so component rules stay free of raw px; see docs/design-rules.md). */
+  --titlebar-h: 44px;
+  --titlebar-inset: 82px; /* clears the macOS traffic lights */
+  --work-rail-w: clamp(250px, 22vw, 332px);
+  --os-rail-w: clamp(210px, 17vw, 272px);
+}
+
 #root {
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .app-shell {
   display: grid;
-  min-height: 100vh;
-  place-items: center;
+  height: 100vh;
+  grid-template-columns: var(--work-rail-w) minmax(0, 1fr) var(--os-rail-w);
+  grid-template-rows: var(--titlebar-h) minmax(0, 1fr);
+  grid-template-areas:
+    "titlebar titlebar titlebar"
+    "work canvas os";
   overflow: hidden;
-  /* Translucent dark plane over the window's vibrancy — keeps glass alive. */
-  background: var(--bg-plane);
+  /* Transparent so the rails sit over the window's vibrancy and read as real
+     glass. The dark plane is painted only on the canvas (.canvas-surface). */
+  background: transparent;
 }
 
-.splash {
+/* ---- Title bar (draggable, clears traffic lights) ---- */
+.titlebar {
+  position: relative;
+  grid-area: titlebar;
+  display: flex;
+  align-items: center;
+  padding-inline: var(--titlebar-inset) var(--pad-sm);
+  border-bottom: 1px solid var(--glass-stroke);
+  -webkit-app-region: drag;
+}
+
+/* Centered so it can never collide with the traffic lights (far left) or the
+   sidebar toggles (far right), at any window width. */
+.titlebar-brand {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: clamp(12px, 0.82vw, 14px);
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.titlebar-logo {
+  width: 18px;
+  height: 18px;
+}
+
+.titlebar-spacer {
+  flex: 1;
+}
+
+.titlebar-actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.rail-toggle {
   display: grid;
-  width: min(360px, calc(100vw - var(--pad-xl) * 2));
-  min-height: clamp(240px, 38vh, 320px);
   place-items: center;
-  padding: var(--pad-xl);
+  width: 26px;
+  height: 26px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--space-2);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.rail-toggle:hover {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+.rail-toggle.is-active {
+  color: var(--accent);
+}
+
+.rail-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- Rails (left work / right OS) — liquid glass ---- */
+.work-rail,
+.os-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: var(--gap-sm);
+  padding: var(--pad-sm);
+  overflow-y: auto;
+  background: var(--glass-rail);
+  background-image: var(--glass-gradient);
+  border-radius: 0;
+  border-block: 0;
+  box-shadow: none;
+  backdrop-filter: blur(46px) saturate(1.8);
+  -webkit-backdrop-filter: blur(46px) saturate(1.8);
+}
+
+.work-rail {
+  grid-area: work;
+  border-inline-end: 1px solid var(--glass-stroke);
+}
+
+.os-rail {
+  grid-area: os;
+  border-inline-start: 1px solid var(--glass-stroke);
+}
+
+.rail-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-sm);
+  padding-block: var(--pad-xs);
+}
+
+.rail-heading {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: clamp(10px, 0.7vw, 12px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.primary-action {
+  padding: var(--pad-xs) var(--pad-sm);
+  color: var(--text-primary);
+  background: var(--accent-soft);
+  border: 1px solid var(--glass-stroke-strong);
+  border-radius: var(--radius-tile);
+  font-weight: 550;
+  cursor: pointer;
+  transition: border-color var(--motion-brand);
+}
+
+.primary-action:hover {
+  border-color: var(--focus-ring);
+}
+
+.rail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.rail-row {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  text-align: start;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-tile);
+  cursor: pointer;
+}
+
+.rail-row:hover {
+  border-color: var(--glass-stroke);
+}
+
+.rail-row.is-active {
+  background: var(--accent-soft);
+  border-color: var(--focus-ring);
+}
+
+.rail-row-title {
+  color: var(--text-primary);
+  font-size: clamp(12px, 0.85vw, 14px);
+  font-weight: 550;
+}
+
+.rail-row-sub {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: clamp(10px, 0.7vw, 12px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted-copy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: clamp(11px, 0.78vw, 13px);
+  line-height: 1.45;
+}
+
+/* ---- Work code panel (files / diff / git) ---- */
+.work-panel {
+  min-height: 0;
+  flex: 1;
+}
+
+.tab-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--read-surface);
+  border: 1px solid var(--glass-stroke);
+  border-radius: var(--radius-tile);
+}
+
+.tab {
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--space-2);
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.tab.is-active {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+.panel-body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding-block-start: var(--pad-xs);
+}
+
+.tree-group {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.tree-directory {
+  padding-block: var(--space-1);
+  color: var(--text-secondary);
+  font-size: clamp(12px, 0.82vw, 13px);
+  font-weight: 600;
+}
+
+.tree-children {
+  display: grid;
+  gap: var(--space-1);
+  padding-inline-start: var(--space-3);
+}
+
+.file-node {
+  overflow: hidden;
+  padding: var(--space-1) var(--space-2);
+  color: var(--text-secondary);
+  text-align: start;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: var(--space-2);
+  cursor: pointer;
+}
+
+.file-node:hover,
+.file-node.is-active {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+.file-editor {
+  display: grid;
+  margin-block-start: var(--pad-sm);
+  overflow: hidden;
+  background: var(--read-surface);
+  border: 1px solid var(--glass-stroke);
+  border-radius: var(--radius-tile);
+}
+
+.file-editor header {
+  padding: var(--space-2) var(--space-3);
+  color: var(--text-secondary);
+  font-size: clamp(11px, 0.74vw, 12px);
+  border-bottom: 1px solid var(--glass-stroke);
+}
+
+.file-editor pre {
+  max-height: min(46vh, 520px);
+  margin: 0;
+  padding: var(--pad-xs);
+  overflow: auto;
+  color: var(--terminal-text);
+  font-family: var(--font-mono);
+  font-size: clamp(11px, 0.76vw, 12px);
+  line-height: 1.5;
+  white-space: pre;
+}
+
+/* ---- Diff view ---- */
+.diff-view {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.diff-stat {
+  margin: 0;
+  padding: var(--pad-xs);
+  overflow: auto;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 0.72vw, 12px);
+  line-height: 1.5;
+  background: var(--read-surface);
+  border: 1px solid var(--glass-stroke);
+  border-radius: var(--radius-tile);
+}
+
+.diff-body {
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 0.72vw, 12px);
+  line-height: 1.5;
+  background: var(--read-surface);
+  border: 1px solid var(--glass-stroke);
+  border-radius: var(--radius-tile);
+}
+
+.diff-line {
+  display: grid;
+  grid-template-columns: 1.6ch minmax(0, 1fr);
+  padding-inline: var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.diff-gutter {
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.diff-line code {
+  color: var(--text-secondary);
+}
+
+.diff-add {
+  background: var(--diff-add-bg);
+}
+
+.diff-add code,
+.diff-add .diff-gutter {
+  color: var(--diff-add);
+}
+
+.diff-del {
+  background: var(--diff-del-bg);
+}
+
+.diff-del code,
+.diff-del .diff-gutter {
+  color: var(--diff-del);
+}
+
+.diff-file code,
+.diff-hunk code {
+  color: var(--diff-meta);
+  font-weight: 600;
+}
+
+/* ---- Git status ---- */
+.git-status {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.git-branch {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: clamp(12px, 0.82vw, 13px);
+}
+
+.git-entries {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--pad-xs);
+  overflow: auto;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 0.72vw, 12px);
+  list-style: none;
+  background: var(--read-surface);
+  border: 1px solid var(--glass-stroke);
+  border-radius: var(--radius-tile);
+}
+
+/* ---- Canvas ---- */
+.canvas-shell {
+  position: relative;
+  grid-area: canvas;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.canvas-toolbar {
+  position: absolute;
+  z-index: 10;
+  inset-block-start: var(--pad-md);
+  inset-inline-start: 50%;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  transform: translateX(-50%);
+}
+
+.canvas-toolbar button {
+  min-width: 28px;
+  padding: var(--space-1) var(--space-2);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--space-2);
+  cursor: pointer;
+}
+
+.canvas-toolbar button:hover {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--glass-stroke);
+}
+
+.toolbar-zoom {
+  min-width: 4ch;
+  color: var(--text-secondary);
+  font-size: clamp(11px, 0.76vw, 13px);
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
-.splash-logo {
-  width: min(112px, 36vw);
-  height: auto;
-  filter: drop-shadow(0 18px 44px var(--accent-soft));
+.canvas-surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: transparent;
+  background-image:
+    radial-gradient(var(--canvas-dot) 1px, transparent 1px), var(--canvas-void);
+  background-size:
+    26px 26px,
+    cover;
+  cursor: grab;
+  touch-action: none;
 }
 
-.splash h1 {
-  margin: var(--pad-sm) 0 0;
+.canvas-surface:active {
+  cursor: grabbing;
+}
+
+.canvas-world {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.empty-canvas {
+  position: absolute;
+  inset-block-start: 46%;
+  inset-inline-start: 50%;
+  display: grid;
+  justify-items: center;
+  width: min(420px, 60vw);
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.empty-canvas img {
+  width: clamp(48px, 5vw, 72px);
+  height: auto;
+  opacity: 0.5;
+}
+
+.empty-canvas h2 {
+  margin: 0;
   color: var(--text-primary);
-  font-size: clamp(26px, 3.4vw, 36px);
-  font-weight: 650;
-  letter-spacing: 0;
+  font-size: clamp(20px, 2vw, 28px);
+  font-weight: 600;
+}
+
+.empty-canvas p {
+  margin: 0;
+  font-size: clamp(12px, 0.85vw, 14px);
+  line-height: 1.5;
+}
+
+.status-pill {
+  position: absolute;
+  z-index: 10;
+  inset-block-end: var(--pad-md);
+  inset-inline-start: 50%;
+  max-width: min(640px, 64vw);
+  padding: var(--space-2) var(--pad-sm);
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: clamp(11px, 0.78vw, 13px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* ---- Terminal tiles ---- */
+.terminal-tile {
+  position: absolute;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: var(--radius-tile);
+  transform-origin: 0 0;
+}
+
+.terminal-tile.is-focused {
+  border-color: var(--focus-ring);
+  box-shadow: var(--shadow-focus);
+}
+
+.terminal-header {
+  display: flex;
+  gap: var(--gap-sm);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--glass-stroke);
+  cursor: grab;
+}
+
+.terminal-header:active {
+  cursor: grabbing;
+}
+
+.terminal-id {
+  display: grid;
+  min-width: 0;
+}
+
+.terminal-id strong {
+  color: var(--text-primary);
+  font-size: clamp(12px, 0.9vw, 14px);
+}
+
+.terminal-id span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: clamp(10px, 0.7vw, 12px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-meta {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.terminal-meta small {
+  color: var(--text-muted);
+  font-size: clamp(10px, 0.7vw, 11px);
+}
+
+.tile-close {
+  padding: var(--space-1) var(--space-2);
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--glass-stroke);
+  border-radius: var(--space-2);
+  font-size: clamp(10px, 0.7vw, 12px);
+  cursor: pointer;
+}
+
+.tile-close:hover {
+  color: var(--text-primary);
+  border-color: var(--diff-del);
+}
+
+.status-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  background: var(--text-muted);
+  border-radius: var(--radius-pill);
+}
+
+.status-running,
+.status-waiting {
+  background: var(--status-running);
+}
+
+.status-done {
+  background: var(--status-done);
+}
+
+.status-error {
+  background: var(--status-error);
+}
+
+.terminal-surface {
+  min-height: 0;
+  padding: var(--space-2);
+  overflow: hidden;
+  background: var(--read-surface);
+}
+
+.terminal-surface .xterm,
+.terminal-surface .xterm-viewport {
+  background: transparent !important;
 }

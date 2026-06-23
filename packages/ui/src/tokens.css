@@ -15,30 +15,47 @@
     radial-gradient(circle at 82% 12%, rgba(14, 45, 84, 0.26), transparent 30rem),
     linear-gradient(180deg, rgba(11, 13, 18, 0.58) 0%, rgba(7, 8, 11, 0.7) 100%);
 
-  --glass-rail: rgba(18, 21, 28, 0.55);
+  /* Rails are "liquid glass": low opacity + heavy blur so the plane/desktop
+     reads through. Keep alpha low; the blur does the work. */
+  --glass-rail: rgba(17, 21, 29, 0.3);
   --glass-pane: rgba(22, 26, 34, 0.5);
   --glass-hud: rgba(20, 24, 32, 0.62);
   --glass-stroke: rgba(255, 255, 255, 0.08);
   --glass-stroke-strong: rgba(255, 255, 255, 0.14);
-  --glass-gradient:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 28%);
+  --glass-gradient: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0) 28%
+  );
+  /* The canvas plane behind the tiles. Neutral + translucent (alpha < 1) so the
+     window vibrancy shows through. No colored glow — keep it calm and dark. */
+  --canvas-void:
+    radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.03), transparent 42rem),
+    linear-gradient(180deg, rgba(10, 12, 17, 0.42) 0%, rgba(6, 7, 11, 0.6) 100%);
+  --canvas-dot: rgba(255, 255, 255, 0.045);
+  --read-surface: rgba(6, 8, 13, 0.6);
 
   --text-primary: rgba(237, 240, 245, 0.95);
   --text-secondary: rgba(237, 240, 245, 0.62);
   --text-muted: rgba(237, 240, 245, 0.38);
+  --terminal-text: rgba(236, 242, 255, 0.92);
 
   --accent: #6ea8ff;
   --accent-soft: rgba(110, 168, 255, 0.16);
   --focus-ring: rgba(110, 168, 255, 0.55);
 
-  --diff-add: #3fb950;
-  --diff-del: #f85149;
+  --diff-add: #56d364;
+  --diff-del: #f97583;
+  --diff-add-bg: rgba(63, 185, 80, 0.12);
+  --diff-del-bg: rgba(248, 81, 73, 0.12);
+  --diff-meta: rgba(110, 168, 255, 0.85);
   --status-running: #d8a657;
   --status-done: #3fb950;
   --status-error: #f85149;
 
   --shadow-pane: 0 18px 48px rgba(0, 0, 0, 0.45);
   --shadow-hud: 0 12px 36px rgba(0, 0, 0, 0.5);
+  --shadow-focus: 0 22px 72px rgba(0, 0, 0, 0.58), 0 0 0 1px var(--focus-ring);
   --radius-pane: 16px;
   --radius-tile: 12px;
   --radius-pill: 999px;
@@ -66,12 +83,13 @@
   --gap-sm: clamp(8px, 1vw, 14px);
   --gap-md: clamp(14px, 1.8vw, 24px);
   --gap-lg: clamp(22px, 2.8vw, 40px);
+  --window-chrome-height: clamp(52px, 5.2vw, 68px);
+  --window-chrome-inline-start: clamp(92px, 9vw, 132px);
 
   --font-ui:
     Inter, Geist, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  --font-mono:
-    "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
   --motion-brand: 180ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 

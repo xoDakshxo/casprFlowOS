@@ -2,8 +2,9 @@
 
 casprFlowOS is built **phase by phase**, in order. Each phase is a self-contained chunk
 of work with a clear goal, a checklist, and an exit criterion. Don't start a phase until
-the previous one's exit criterion is green. Each phase is **many small PRs**, not one
-mega-commit (see [`../clean-code.md`](../clean-code.md)).
+the previous one's exit criterion is green. Work in small reviewable slices while a phase
+is in progress, but **do not commit partial phase slices**. Commit only after the whole
+phase exit criterion is green and the user explicitly approves.
 
 The ordering is deliberate, matching the user's instruction: **cleanup first, then
 rebrand, then build features — with taste at every step.**
@@ -29,12 +30,14 @@ rebrand, then build features — with taste at every step.**
 
 1. Read the phase doc + the docs it references (`vision`, `architecture`,
    `design-language`, `voice-and-intent`, `extraction-map`, `clean-code`).
-2. Open small PRs, each advancing one checklist item.
+2. Work in small slices, each advancing one checklist item.
 3. Keep typecheck/lint/tests green.
 4. Don't pull in scope from a later phase. If you discover a dependency, note it and
    sequence it, don't smuggle it.
 5. End the phase by verifying the exit criterion **by running the app**, not just by
    typechecking.
+6. Give the user phase-specific validation steps and wait for explicit approval before
+   staging or committing the completed phase.
 
 ## Principles that span all phases
 
