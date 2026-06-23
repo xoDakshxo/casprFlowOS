@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Only these dependencies are allowed to run install/build lifecycle scripts.
+# Keep this list minimal and auditable (supply-chain hygiene).
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - node-pty

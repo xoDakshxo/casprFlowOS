@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+dist-electron/
+dist-cli/
+build/
+out/
+*.tsbuildinfo
+
+# local env & secrets
+.env
+.env.local
+*.local.json
+casprflowos.config.local.json
+
+# models (downloaded at runtime, never committed)
+models/
+*.bin
+*.gguf
+
+# editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# logs
+*.log
+npm-debug.log*
