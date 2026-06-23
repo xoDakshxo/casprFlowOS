@@ -8,6 +8,9 @@ mega-commit (see [`../clean-code.md`](../clean-code.md)).
 The ordering is deliberate, matching the user's instruction: **cleanup first, then
 rebrand, then build features — with taste at every step.**
 
+> **Live status:** [`TRACKER.md`](TRACKER.md) — flip phase status and check off items there
+> as you work. It is the single source of "where is the build right now."
+
 | Phase | Goal | Exit criterion |
 |---|---|---|
 | [0 — Foundations](phase-0-foundations.md) | Empty monorepo boots an Electron window | `pnpm dev` opens a dark glass window that says "casprFlowOS" |

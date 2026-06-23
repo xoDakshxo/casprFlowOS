@@ -53,6 +53,8 @@ casprFlowOS/
 
 | Doc | What it covers |
 |---|---|
+| [`AGENTS.md`](AGENTS.md) | **Agents start here** — working brief, invariants, how to work |
+| [`docs/implementation/TRACKER.md`](docs/implementation/TRACKER.md) | Live phase status + checklists |
 | [`docs/vision.md`](docs/vision.md) | The product — what we're building and why |
 | [`docs/architecture.md`](docs/architecture.md) | System layers, the voice/text → action pipeline |
 | [`docs/design-language.md`](docs/design-language.md) | Dark + glass visual system, transparent terminals, canvas themes |
