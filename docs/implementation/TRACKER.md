@@ -10,7 +10,7 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 
 | # | Phase | Status | Exit criterion met? | Notes |
 |---|---|---|---|---|
-| 0 | [Foundations](phase-0-foundations.md) | ⬜ | — | `pnpm dev` boots a dark glass window |
+| 0 | [Foundations](phase-0-foundations.md) | ✅ | ✅ | `pnpm dev` boots a dark glass window; `pnpm verify` green |
 | 1 | [Cleanup & extract core](phase-1-cleanup-extract.md) | ⬜ | — | canvas + pty terminals + whole project/code panel; fluff deleted |
 | 2 | [Rebrand](phase-2-rebrand.md) | ⬜ | — | no `termcanvas` strings; casprFlow logo + name |
 | 3 | [Design system & glass](phase-3-design-glass.md) | ⬜ | — | glass UI, translucent terminals, canvas themes |
@@ -23,7 +23,7 @@ Status legend: ⬜ not started · 🟡 in progress · ✅ done · ⛔ blocked
 | 10 | [Polish & latency](phase-10-polish.md) | ⬜ | — | taste + latency budget + shippable build |
 
 **Current phase:** Phase 0 — Foundations
-**Last updated:** (set when you touch this file)
+**Last updated:** 2026-06-23
 
 ---
 
@@ -33,12 +33,12 @@ Mirror of each phase doc's tasks. Check items here as they land; the phase doc r
 full spec. Keep them in sync.
 
 ### Phase 0 — Foundations
-- [ ] Root toolchain (prettier/eslint/ts); `pnpm -r build/typecheck/lint/test`
-- [ ] Per-package `tsconfig.json` extending base, with project references
-- [ ] `packages/shared`: core types/result/logger/event-bus stubs
-- [ ] `packages/ui`: tokens.css + `.glass` + `GlassPane`/`GlassPill`
-- [ ] `apps/desktop`: minimal main + empty typed preload + logo splash renderer
-- [ ] `pnpm dev` boots; `pnpm verify` green
+- [x] Root toolchain (prettier/eslint/ts); `pnpm -r build/typecheck/lint/test`
+- [x] Per-package `tsconfig.json` extending base, with project references
+- [x] `packages/shared`: core types/result/logger/event-bus stubs
+- [x] `packages/ui`: tokens.css + `.glass` + `GlassPane`/`GlassPill`
+- [x] `apps/desktop`: minimal main + empty typed preload + logo splash renderer
+- [x] `pnpm dev` boots; `pnpm verify` green
 
 ### Phase 1 — Cleanup & extract core
 - [ ] Port `src/canvas/` → `canvas-core` (drop drawing/annotation/cluster/waypoint)

@@ -1,0 +1,35 @@
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  /* Translucent dark plane over the window's vibrancy — keeps glass alive. */
+  background: var(--bg-plane);
+}
+
+.splash {
+  display: grid;
+  width: min(360px, calc(100vw - var(--pad-xl) * 2));
+  min-height: clamp(240px, 38vh, 320px);
+  place-items: center;
+  padding: var(--pad-xl);
+  text-align: center;
+}
+
+.splash-logo {
+  width: min(112px, 36vw);
+  height: auto;
+  filter: drop-shadow(0 18px 44px var(--accent-soft));
+}
+
+.splash h1 {
+  margin: var(--pad-sm) 0 0;
+  color: var(--text-primary);
+  font-size: clamp(26px, 3.4vw, 36px);
+  font-weight: 650;
+  letter-spacing: 0;
+}

@@ -1,0 +1,25 @@
+{
+  "rules": {
+    "declaration-property-value-disallowed-list": [
+      {
+        "/^padding/": ["/\\d+px/"],
+        "/^margin/": ["/\\d+px/"],
+        "/gap$/": ["/\\d+px/"],
+        "background": ["/#[0-9a-fA-F]{3,8}/", "/\\brgba?\\(/"],
+        "background-color": ["/#[0-9a-fA-F]{3,8}/", "/\\brgba?\\(/"]
+      },
+      {
+        "message": "casprFlowOS design rule: spacing must use fluid tokens (--pad-* / --gap-*, or --space-* for fine details), never raw px; backgrounds must use a token (var(--glass-*) / var(--bg-*) / transparent), never a literal hex/rgba — opaque backgrounds kill the glass. See docs/design-rules.md."
+      }
+    ]
+  },
+  "ignoreFiles": ["**/dist/**", "**/node_modules/**"],
+  "overrides": [
+    {
+      "files": ["packages/ui/src/tokens.css"],
+      "rules": {
+        "declaration-property-value-disallowed-list": null
+      }
+    }
+  ]
+}

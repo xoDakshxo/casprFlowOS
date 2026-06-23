@@ -49,7 +49,23 @@ usable parts of two prior repos and growing in a new direction.
 - The left work sidebar keeps the **entire** TermCanvas project/code panel (file tree +
   diffs + git + editor), not a diff-only view.
 
-## How to work
+## Design (any UI work — read before touching a component or stylesheet)
+
+UI here keeps regressing. Two layers govern all visual work:
+
+1. **The floor (mechanical, enforced):** [`docs/design-rules.md`](docs/design-rules.md) +
+   the auto-loaded `.codex/skills/casprflowos-design` skill. Real macOS glass (vibrancy +
+   translucent layers — never an opaque background in the stack), **computed/responsive
+   spacing** (fluid `--pad-*`/`--gap-*` tokens, never raw px in padding/margin/gap/inset),
+   tokens-only styling, `ui` primitives. `pnpm lint:css` (stylelint) **fails the build** on
+   raw-px spacing and non-token backgrounds — run it before you commit UI.
+2. **The taste (for any net-new design):** use the **`frontend-design` plugin/skill** to
+   make deliberate, non-templated choices (palette, type, layout, one signature element).
+   casprFlowOS is dark + glass; don't ship generic AI-default UI. Plan the design, critique
+   it against the brief, then build — and **run the app and look at it** (resize 920px →
+   full-screen) before calling it done. "It typechecks" is not "the UI is done."
+
+
 
 - Go **phase by phase, in order**. Don't start a phase until the previous phase's exit
   criterion is green **and verified by running the app** (not just typecheck).
