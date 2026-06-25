@@ -1,4 +1,11 @@
-import { useCallback, useState, useRef, useMemo, useEffect } from "react";
+import {
+  useCallback,
+  useState,
+  useRef,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+} from "react";
 import { useCanvasStore, COLLAPSED_TAB_WIDTH } from "../stores/canvasStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useTerminalRuntimeStore } from "../terminal/terminalRuntimeStore";
@@ -83,6 +90,17 @@ export function LeftPanel() {
   const setCollapsed = useCanvasStore((s) => s.setLeftPanelCollapsed);
   const setWidth = useCanvasStore((s) => s.setLeftPanelWidth);
   const setActiveTab = useCanvasStore((s) => s.setLeftPanelActiveTab);
+
+  // Sliding tab thumb — measured to hug the active tab so its length is always
+  // proportionate to the content (not a fixed 1/N cell).
+  const segTabsRef = useRef<HTMLDivElement>(null);
+  const [segThumb, setSegThumb] = useState({ left: 0, width: 0 });
+  useLayoutEffect(() => {
+    const el = segTabsRef.current?.querySelector<HTMLElement>(
+      '[data-active="true"]',
+    );
+    if (el) setSegThumb({ left: el.offsetLeft, width: el.offsetWidth });
+  }, [activeTab, width]);
 
   const projects = useProjectStore((s) => s.projects);
   const runtimeTerminals = useTerminalRuntimeStore((s) => s.terminals);
@@ -276,7 +294,7 @@ export function LeftPanel() {
     <>
       <PinDrawer />
       <div
-        className="fixed left-0 z-40 bg-[var(--surface)] border-r border-[var(--border)] overflow-hidden"
+        className="caspr-rail caspr-rail--left fixed left-0 z-40 overflow-hidden"
         style={{
           top: 44,
           height: "calc(100vh - 44px)",
@@ -353,24 +371,34 @@ export function LeftPanel() {
             style={{ width }}
           >
             <div className="shrink-0 px-2 pt-2 pb-2">
-              <div className="flex items-center gap-0.5 rounded-lg bg-[var(--bg)] p-0.5">
-                {LEFT_TAB_CONFIG.map(({ id, icon: Icon, labelKey }) => {
-                  const isActive = activeTab === id;
-                  return (
-                    <button
-                      key={id}
-                      className={`cf-row-icon flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-[11px] font-medium ${
-                        isActive
-                          ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
-                          : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                      }`}
-                      onClick={() => setActiveTab(id)}
-                    >
-                      <Icon size={13} />
-                      {width > 260 && <span>{t[labelKey]}</span>}
-                    </button>
-                  );
-                })}
+              <div className="caspr-seg">
+                <div className="caspr-seg-tabs" ref={segTabsRef}>
+                  <div
+                    className="caspr-seg-thumb"
+                    style={{
+                      width: segThumb.width,
+                      transform: `translateX(${segThumb.left}px)`,
+                      opacity: segThumb.width ? 1 : 0,
+                      // Track the panel instantly while resizing; keep the
+                      // springy slide for tab switches.
+                      transition: dragging ? "none" : undefined,
+                    }}
+                  />
+                  {LEFT_TAB_CONFIG.map(({ id, icon: Icon, labelKey }) => {
+                    const isActive = activeTab === id;
+                    return (
+                      <button
+                        key={id}
+                        className="caspr-seg-tab"
+                        data-active={isActive}
+                        onClick={() => setActiveTab(id)}
+                      >
+                        <Icon size={13} />
+                        {width > 260 && <span>{t[labelKey]}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
                 <button
                   className="cf-row-icon flex items-center justify-center w-7 h-7 rounded-md text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 ml-0.5 shrink-0"
                   disabled={addingProject}

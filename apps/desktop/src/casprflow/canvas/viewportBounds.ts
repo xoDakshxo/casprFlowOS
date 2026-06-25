@@ -4,6 +4,12 @@ import {
   PIN_DRAWER_WIDTH,
 } from "../stores/canvasStore";
 
+// The canvas container is inset below the top toolbar (it no longer lives
+// behind the chrome), so window↔world Y conversions must subtract/add the
+// toolbar height. Kept as a local constant (matches TOOLBAR_HEIGHT) to avoid a
+// store/toolbar import cycle in this pure-math module.
+const CANVAS_TOP_OFFSET = 44;
+
 // The right panel hosts the code-navigation tabs (Files / Diff /
 // Git / Memory). Canvas placement math needs to exclude its
 // footprint so terminals don't spawn underneath it.
@@ -38,7 +44,7 @@ export function canvasPointToScreenPoint(
   );
   return {
     x: leftInset + viewport.x + x * viewport.scale,
-    y: viewport.y + y * viewport.scale,
+    y: CANVAS_TOP_OFFSET + viewport.y + y * viewport.scale,
   };
 }
 
@@ -57,7 +63,7 @@ export function screenPointToCanvasPoint(
   );
   return {
     x: (clientX - leftInset - viewport.x) / viewport.scale,
-    y: (clientY - viewport.y) / viewport.scale,
+    y: (clientY - CANVAS_TOP_OFFSET - viewport.y) / viewport.scale,
   };
 }
 
@@ -77,7 +83,9 @@ export function screenDeltaToCanvasDelta(
  * and the top toolbar so callers that want to place new content "inside the
  * visible viewport" don't end up putting it under a panel or the toolbar.
  */
-const CANVAS_TOP_INSET = 56;
+// Small placement margin from the top of the (already toolbar-inset) canvas
+// container, so auto-placed content isn't flush against the top edge.
+const CANVAS_TOP_MARGIN = 12;
 
 export function getVisibleCanvasWorldRect(
   viewport: Viewport,
@@ -97,9 +105,12 @@ export function getVisibleCanvasWorldRect(
     0,
     window.innerWidth - leftInset - rightInset,
   );
-  const screenH = Math.max(0, window.innerHeight - CANVAS_TOP_INSET);
+  const screenH = Math.max(
+    0,
+    window.innerHeight - CANVAS_TOP_OFFSET - CANVAS_TOP_MARGIN,
+  );
   const x = -viewport.x / viewport.scale;
-  const y = (-viewport.y + CANVAS_TOP_INSET) / viewport.scale;
+  const y = (-viewport.y + CANVAS_TOP_MARGIN) / viewport.scale;
   return {
     x,
     y,

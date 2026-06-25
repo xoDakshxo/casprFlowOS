@@ -52,14 +52,12 @@ export function Toolbar() {
   return (
     <>
       <div
-        className="fixed top-0 left-0 right-0 z-50 flex h-11 items-center overflow-hidden border-b border-[var(--border)]"
+        className="caspr-toolbar fixed top-0 left-0 right-0 z-50 flex h-11 items-center overflow-hidden"
         style={
           {
             paddingLeft: isMac ? MAC_STOPLIGHT_GUTTER : 16,
             paddingRight: isWin ? WIN_CAPTION_GUTTER : 16,
             WebkitAppRegion: "drag",
-            background:
-              "linear-gradient(to bottom, var(--bg) 0%, color-mix(in srgb, var(--bg) 88%, var(--surface) 12%) 100%)",
           } as React.CSSProperties
         }
       >

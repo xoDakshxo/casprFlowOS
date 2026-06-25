@@ -263,7 +263,7 @@ export function PinDrawer() {
 
   return (
     <div
-      className="fixed bg-[var(--surface)] border-r border-[var(--border)] flex flex-col overflow-hidden"
+      className="fixed flex flex-col overflow-hidden"
       style={{
         zIndex: 39,
         top: TOOLBAR_HEIGHT,
@@ -271,10 +271,20 @@ export function PinDrawer() {
         height: `calc(100vh - ${TOOLBAR_HEIGHT}px)`,
         width: PIN_DRAWER_WIDTH,
         transform: isOpen ? "translateX(0)" : `translateX(-${PIN_DRAWER_WIDTH}px)`,
+        background: "var(--surface)",
+        borderRight: "1px solid var(--border)",
+        // When closed the drawer is tucked behind the left rail. The rail is
+        // translucent now, so we can't rely on it to hide the drawer — opacity:0
+        // + visibility:hidden fully removes it (fill AND content) so nothing
+        // bleeds through. It fades/slides back in when opened.
+        opacity: isOpen ? 1 : 0,
+        visibility: isOpen ? "visible" : "hidden",
         // `transform` rides the role-based motion tokens; `left` stays on
         // PANEL_TRANSITION because it must track LeftPanel's width tween.
         transition:
           `transform var(--duration-natural) var(--ease-out-soft), ` +
+          `opacity var(--duration-natural) var(--ease-out-soft), ` +
+          `visibility var(--duration-natural) var(--ease-out-soft), ` +
           `left ${PANEL_TRANSITION_DURATION_MS}ms ${PANEL_TRANSITION_EASING_CSS}`,
         boxShadow: "var(--shadow-elev-1)",
         pointerEvents: isOpen ? "auto" : "none",

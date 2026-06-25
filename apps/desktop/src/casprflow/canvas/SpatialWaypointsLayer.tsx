@@ -4,7 +4,7 @@ import { useCanvasStore } from "../stores/canvasStore";
 import { usePinStore } from "../stores/pinStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useT } from "../i18n/useT";
-import { getCanvasLeftInset, getCanvasRightInset } from "./viewportBounds";
+import { getCanvasLeftInset } from "./viewportBounds";
 import {
   WAYPOINT_NOOP_EVENT,
   WAYPOINT_RECALLED_EVENT,
@@ -15,8 +15,8 @@ import {
 import type { SpatialWaypointSlot } from "../types";
 
 const DOT_DIAMETER = 6;
-const DOT_GAP = 14;
-const STRIP_BOTTOM_OFFSET = 28;
+const DOT_GAP = 12;
+const STRIP_BOTTOM_OFFSET = 20;
 
 // Save flash: short, declarative — "I just landed in slot N".
 const SAVE_FLASH_MS = 700;
@@ -100,13 +100,8 @@ export function SpatialWaypointsLayer() {
   const focusedProjectId = useProjectStore((s) => s.focusedProjectId);
   const leftPanelCollapsed = useCanvasStore((s) => s.leftPanelCollapsed);
   const leftPanelWidth = useCanvasStore((s) => s.leftPanelWidth);
-  const rightPanelCollapsed = useCanvasStore((s) => s.rightPanelCollapsed);
-  const rightPanelWidth = useCanvasStore((s) => s.rightPanelWidth);
   const pinDrawerOpen = usePinStore((s) => s.openProjectPath !== null);
 
-  const [windowWidth, setWindowWidth] = useState(() =>
-    typeof window !== "undefined" ? window.innerWidth : 0,
-  );
   const [savedFlashSlot, setSavedFlashSlot] =
     useState<SpatialWaypointSlot | null>(null);
   const [recalledSlot, setRecalledSlot] =
@@ -115,12 +110,6 @@ export function SpatialWaypointsLayer() {
     useState<SpatialWaypointSlot | null>(null);
   const [hoveredSlot, setHoveredSlot] =
     useState<SpatialWaypointSlot | null>(null);
-
-  useEffect(() => {
-    const onResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   useEffect(() => {
     let savedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -189,25 +178,17 @@ export function SpatialWaypointsLayer() {
     return null;
   }
 
-  const leftInset = getCanvasLeftInset(
+  // Anchored to the canvas bottom-LEFT, mirroring the zoom controls on the
+  // bottom-right. Inset past the left rail so it floats inside the canvas.
+  const stripLeft = getCanvasLeftInset(
     leftPanelCollapsed,
     leftPanelWidth,
     pinDrawerOpen,
-  );
-  const rightInset = getCanvasRightInset(
-    rightPanelCollapsed,
-    rightPanelWidth,
-  );
-  const stripWidth =
-    WAYPOINT_SLOTS.length * DOT_DIAMETER +
-    (WAYPOINT_SLOTS.length - 1) * DOT_GAP;
-  const canvasMid = leftInset + (windowWidth - leftInset - rightInset) / 2;
-  const stripLeft = Math.round(canvasMid - stripWidth / 2);
+  ) + 16;
 
-  // Whole row dimms further when no slots are saved — empty state
-  // shouldn't draw the eye. Once even one waypoint exists, the row
-  // surfaces a touch more so the user knows their map is active.
-  const containerOpacity = hasAnyWaypoint ? 1 : 0.55;
+  // Whole row dims when no slots are saved — empty state shouldn't draw the
+  // eye. Once even one waypoint exists, it surfaces so the map reads as active.
+  const containerOpacity = hasAnyWaypoint ? 1 : 0.5;
 
   return createPortal(
     <div
@@ -215,21 +196,26 @@ export function SpatialWaypointsLayer() {
       style={{
         bottom: STRIP_BOTTOM_OFFSET,
         left: stripLeft,
-        width: stripWidth,
         zIndex: 30,
         opacity: containerOpacity,
-        transition:
-          "opacity var(--duration-natural) var(--ease-out-soft)",
+        transition: "opacity var(--duration-natural) var(--ease-out-soft), left var(--duration-natural) var(--ease-out-soft)",
       }}
       aria-hidden="true"
     >
       <div
+        className="pointer-events-auto"
         style={{
           display: "flex",
           alignItems: "center",
           gap: DOT_GAP,
           height: DOT_DIAMETER,
           position: "relative",
+          padding: "9px 12px",
+          borderRadius: 999,
+          backgroundColor: "var(--glass-pill)",
+          border: "1px solid var(--border)",
+          boxShadow:
+            "inset 0 1px 0 var(--glass-edge), 0 8px 24px -12px rgba(0,0,0,0.6)",
         }}
       >
         {WAYPOINT_SLOTS.map((slot) => {
@@ -270,8 +256,9 @@ export function SpatialWaypointsLayer() {
           <div
             className="cf-eyebrow absolute"
             style={{
-              bottom: DOT_DIAMETER + 10,
+              bottom: DOT_DIAMETER + 16,
               left:
+                12 +
                 WAYPOINT_SLOTS.indexOf(hoveredSlot) * (DOT_DIAMETER + DOT_GAP) +
                 DOT_DIAMETER / 2,
               transform: "translateX(-50%)",

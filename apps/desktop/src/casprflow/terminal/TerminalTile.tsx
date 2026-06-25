@@ -53,6 +53,8 @@ import { useViewportFocusStore } from "../stores/viewportFocusStore";
 import { TERMINAL_TYPE_CONFIG } from "./terminalTypeConfig";
 import { AgentRenderer } from "../components/agent/AgentRenderer";
 import { ActivitySparkline } from "./ActivitySparkline";
+import { suggestedCallsign } from "./callsigns";
+import { AgentGlyph } from "../components/agentIcons";
 import { TerminalFindOverlay } from "./TerminalFindOverlay";
 import { WtermTile } from "./WtermTile";
 import { useTerminalFindStore } from "../stores/terminalFindStore";
@@ -930,6 +932,9 @@ export function TerminalTile({
     >
       <div
         className="cf-tile-header relative flex items-center gap-2 px-3 py-2 select-none shrink-0"
+        style={{
+          backgroundImage: `linear-gradient(90deg, color-mix(in srgb, ${config.color} 16%, transparent), transparent 280px)`,
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -944,18 +949,25 @@ export function TerminalTile({
           panToTerminal(terminal.id);
         }}
       >
-        {terminal.origin !== "agent" && (
-          <div
-            className="w-[3px] h-3 rounded-full shrink-0"
-            style={{ background: "var(--amber)", opacity: 0.7 }}
-          />
-        )}
-        <span
-          className="text-[11px] font-medium"
-          style={{ color: config.color, fontFamily: '"Geist Mono", monospace' }}
+        {/* Agent identity: brand icon + highlighted name, so the agent is
+            instantly recognisable. */}
+        <div
+          className="shrink-0 flex items-center gap-1.5 rounded-md py-0.5 pl-0.5 pr-2"
+          style={{
+            backgroundColor: `color-mix(in srgb, ${config.color} 14%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${config.color} 30%, transparent)`,
+          }}
         >
-          {config.label}
-        </span>
+          <span className="shrink-0" style={{ width: 17, height: 17 }}>
+            <AgentGlyph type={terminal.type} />
+          </span>
+          <span
+            className="text-[11.5px] font-semibold leading-none"
+            style={{ color: config.color, fontFamily: '"Geist Mono", monospace' }}
+          >
+            {config.label}
+          </span>
+        </div>
         <HierarchyBadges terminal={terminal} />
         <span
           className="shrink-0 whitespace-nowrap text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--border)] rounded px-1 py-0.5 transition-colors duration-quick cursor-pointer"
@@ -1031,7 +1043,7 @@ export function TerminalTile({
                 ref={customTitleInputRef}
                 className="min-w-0 flex-1 bg-transparent outline-none leading-[22px] text-[var(--text-primary)]"
                 value={customTitleDraft}
-                placeholder={t.terminal_custom_title_placeholder}
+                placeholder={suggestedCallsign(terminal.id)}
                 onChange={(e) => setCustomTitleDraft(e.target.value)}
                 onBlur={saveCustomTitleEdit}
                 onKeyDown={(e) => {
@@ -1051,8 +1063,12 @@ export function TerminalTile({
               </span>
             ) : (
               <>
-                <span className="min-w-0 flex-1 truncate leading-[22px]">
-                  {terminal.customTitle || t.terminal_custom_title_placeholder}
+                <span
+                  className={`min-w-0 flex-1 truncate leading-[22px] ${
+                    terminal.customTitle ? "" : "text-[var(--text-faint)]"
+                  }`}
+                >
+                  {terminal.customTitle || suggestedCallsign(terminal.id)}
                 </span>
                 <button
                   type="button"
@@ -1095,7 +1111,7 @@ export function TerminalTile({
           {!useAgentRenderer && lodMode === "live" && !terminal.minimized && (
             <button
               type="button"
-              className="cf-tile-action text-[var(--text-faint)] hover:text-[var(--text-primary)] p-1 rounded-md hover:bg-[var(--border)]"
+              className="cf-tile-action p-1 rounded-md text-[color-mix(in_srgb,var(--accent)_78%,transparent)] hover:text-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_16%,transparent)]"
               title={t.shortcut_open_terminal_find}
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -1103,11 +1119,11 @@ export function TerminalTile({
                 handleOpenFind();
               }}
             >
-              <Search size={10} strokeWidth={1.6} aria-hidden="true" />
+              <Search size={11} strokeWidth={1.9} aria-hidden="true" />
             </button>
           )}
           <button
-            className="cf-tile-action text-[var(--text-faint)] hover:text-[var(--text-primary)] p-1 rounded-md hover:bg-[var(--border)]"
+            className="cf-tile-action text-[var(--amber)] bg-[color-mix(in_srgb,var(--amber)_13%,transparent)] hover:bg-[color-mix(in_srgb,var(--amber)_26%,transparent)] p-1 rounded-md"
             data-visible="always"
             data-pinned={terminal.minimized ? "true" : undefined}
             onMouseDown={(e) => e.stopPropagation()}
@@ -1131,14 +1147,14 @@ export function TerminalTile({
                 <path
                   d="M2 5H8"
                   stroke="currentColor"
-                  strokeWidth="1.2"
+                  strokeWidth="1.7"
                   strokeLinecap="round"
                 />
               )}
             </svg>
           </button>
           <button
-            className="cf-tile-action text-[var(--text-faint)] hover:text-[var(--red)] p-1 rounded-md hover:bg-[var(--border)]"
+            className="cf-tile-action text-[var(--red)] bg-[color-mix(in_srgb,var(--red)_13%,transparent)] hover:bg-[color-mix(in_srgb,var(--red)_26%,transparent)] p-1 rounded-md"
             data-visible="always"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -1150,7 +1166,7 @@ export function TerminalTile({
               <path
                 d="M2.5 2.5L7.5 7.5M7.5 2.5L2.5 7.5"
                 stroke="currentColor"
-                strokeWidth="1.2"
+                strokeWidth="1.7"
                 strokeLinecap="round"
               />
             </svg>

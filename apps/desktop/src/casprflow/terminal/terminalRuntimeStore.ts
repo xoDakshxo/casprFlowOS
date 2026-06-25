@@ -1142,7 +1142,9 @@ function createTerminalRenderer(
     // addon-search uses registerDecoration for match counts/highlights, and
     // xterm exposes that API behind the proposed API gate.
     allowProposedApi: true,
-    allowTransparency: false,
+    // Translucent terminal: the theme background carries an alpha so the canvas
+    // faintly shows through the tile (glass aesthetic).
+    allowTransparency: true,
     cursorBlink: true,
     cursorStyle: "bar",
     cursorWidth: 2,

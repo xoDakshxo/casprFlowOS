@@ -24,6 +24,7 @@ import { useCanvasStore } from "../stores/canvasStore";
 import { usePinStore } from "../stores/pinStore";
 import { useDrawingStore } from "../stores/drawingStore";
 import { useCanvasToolStore } from "../stores/canvasToolStore";
+import { useArrangingStore } from "../stores/arrangingStore";
 import { usePreferencesStore } from "../stores/preferencesStore";
 import { useSidebarDragStore } from "../stores/sidebarDragStore";
 import {
@@ -54,8 +55,10 @@ import { buildCanvasFlowNodes } from "./nodeProjection";
 import { xyflowNodeTypes, type CanvasFlowNode } from "./xyflowNodes";
 import {
   getCanvasLeftInset,
+  getCanvasRightInset,
   rectIntersectsCanvasViewport,
 } from "./viewportBounds";
+import { TOOLBAR_HEIGHT } from "../toolbar/toolbarHeight";
 import { clampScale, zoomAtClientPoint } from "./viewportZoom";
 import { resolveCollisions } from "./collisionResolver";
 import { WorktreeLabelLayer } from "./WorktreeLabelLayer";
@@ -319,6 +322,8 @@ function XyFlowCanvasInner() {
     leftPanelWidth,
     taskDrawerOpen,
   );
+  const rightOffset = getCanvasRightInset(rightPanelCollapsed, rightPanelWidth);
+  const arranging = useArrangingStore((s) => s.arranging);
   const sidebarDragging = useSidebarDragStore((s) => s.active);
   const isDrawing = drawingEnabled && drawingTool !== "select";
   const isPanMode = canvasTool === "hand" || spaceHeld;
@@ -685,13 +690,19 @@ function XyFlowCanvasInner() {
   return (
     <div
       ref={canvasContainerRef}
-      className={`fixed top-0 right-0 bottom-0 overflow-hidden canvas-bg ${cursorClass}`}
+      className={`fixed bottom-0 overflow-hidden canvas-bg ${cursorClass} ${arranging ? "cf-arranging" : ""}`}
       data-activity-heatmap={activityHeatmapEnabled ? "true" : undefined}
       style={{
+        // Inset the opaque canvas to the centre: below the toolbar, between the
+        // rails. The surrounding margins stay transparent so the glass frame
+        // shows the desktop, never the canvas.
+        top: TOOLBAR_HEIGHT,
         left: leftOffset,
+        right: rightOffset,
         transition: sidebarDragging
           ? undefined
-          : `left ${PANEL_TRANSITION_DURATION_MS}ms ${PANEL_TRANSITION_EASING_CSS}`,
+          : `left ${PANEL_TRANSITION_DURATION_MS}ms ${PANEL_TRANSITION_EASING_CSS}, ` +
+            `right ${PANEL_TRANSITION_DURATION_MS}ms ${PANEL_TRANSITION_EASING_CSS}`,
       }}
       onMouseDownCapture={handleContainerMouseDown}
       onWheelCapture={handleWheelCapture}

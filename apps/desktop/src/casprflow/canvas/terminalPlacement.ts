@@ -85,36 +85,21 @@ function findTerminal(
 }
 
 /**
- * Anchor off the focused terminal in the target worktree, if any. This is
- * the primary cmd+t path: "give me a new terminal next to what I'm working
- * on", mirroring the parent-terminal branch.
+ * Grid auto-placement. New terminals fill the worktree's tiles into a compact
+ * grid anchored at the cluster's top-left, filling COLUMN-MAJOR (down, then
+ * across) — so tile 1 sits top-left, tile 2 below it, tile 3 starts the next
+ * column, etc. The number of rows is chosen to fit the visible viewport height,
+ * so the grid stays in view and the most tiles are visible. Returns null when
+ * the worktree has no tiles yet (caller falls through to viewport-centre).
  */
-function focusedTerminalAnchor(
+function gridSlotAnchor(
   projects: ProjectData[],
   projectId: string,
   worktreeId: string,
-): { x: number; y: number; right: number } | null {
-  const project = projects.find((entry) => entry.id === projectId);
-  const worktree = project?.worktrees.find((entry) => entry.id === worktreeId);
-  if (!worktree) {
-    return null;
-  }
-  const focused = worktree.terminals.find((t) => t.focused && !t.stashed);
-  if (!focused) {
-    return null;
-  }
-  return {
-    x: focused.x,
-    y: focused.y,
-    right: focused.x + focused.width,
-  };
-}
-
-function worktreeAnchor(
-  projects: ProjectData[],
-  projectId: string,
-  worktreeId: string,
-): { x: number; y: number; bottom: number; right: number } | null {
+  width: number,
+  height: number,
+  viewportRect?: { x: number; y: number; w: number; h: number },
+): { x: number; y: number } | null {
   const project = projects.find((entry) => entry.id === projectId);
   const worktree = project?.worktrees.find((entry) => entry.id === worktreeId);
   if (!worktree) {
@@ -126,21 +111,30 @@ function worktreeAnchor(
     return null;
   }
 
-  // Anchor off the rightmost sibling so new terminals flow horizontally
-  // (matching the parent-terminal branch below). Keep the new tile aligned
-  // with the rightmost sibling's top edge.
-  let rightmost = tiles[0];
+  // Cluster origin: top-left of the existing tiles.
+  let minX = Infinity;
+  let minY = Infinity;
   for (const tile of tiles) {
-    if (tile.x + tile.width > rightmost.x + rightmost.width) {
-      rightmost = tile;
-    }
+    minX = Math.min(minX, tile.x);
+    minY = Math.min(minY, tile.y);
   }
 
+  // Rows that fit the visible viewport height (clamped to a sensible band so
+  // we always make a real grid, never a single row).
+  const cellH = height + ADJACENCY_GAP;
+  let rows = 2;
+  if (viewportRect && viewportRect.h > 0 && cellH > 0) {
+    rows = Math.max(1, Math.floor(viewportRect.h / cellH));
+  }
+  rows = Math.max(2, Math.min(rows, 4));
+
+  const index = tiles.length; // slot for the new tile
+  const col = Math.floor(index / rows);
+  const row = index % rows;
+
   return {
-    x: rightmost.x,
-    y: rightmost.y,
-    right: rightmost.x + rightmost.width,
-    bottom: rightmost.y + rightmost.height,
+    x: minX + col * (width + ADJACENCY_GAP),
+    y: minY + row * (height + ADJACENCY_GAP),
   };
 }
 
@@ -217,54 +211,41 @@ export function pickPlacement(input: PlacementInput): PlacementResult {
     }
   } else {
     // Anchor priority when neither preferredPosition nor parent is given:
-    //   1. focused terminal in the target worktree (cmd+t "new tab next
-    //      to what I'm working on")
-    //   2. rightmost sibling in the target worktree
-    //   3. rightmost terminal in another worktree of the same project
+    //   1. next slot in a compact GRID of the target worktree's tiles
+    //      (column-major, sized to the viewport — keeps the most tiles visible)
+    //   2. rightmost terminal in another worktree of the same project
     //      ("climb up to find relatives")
-    //   4. viewport centre (so an empty project drops the tile in front
-    //      of the user, not at the origin)
-    //   5. provided fallback or {0, 0}
-    const focused = focusedTerminalAnchor(
+    //   3. viewport centre (empty project → drop the first tile in front of
+    //      the user, not at the origin)
+    //   4. provided fallback or {0, 0}
+    const grid = gridSlotAnchor(
       projects,
       input.projectId,
       input.worktreeId,
+      width,
+      height,
+      input.viewportRect,
     );
-    if (focused) {
-      anchor = {
-        x: focused.right + ADJACENCY_GAP,
-        y: focused.y,
-      };
+    if (grid) {
+      anchor = grid;
     } else {
-      const sibling = worktreeAnchor(
+      const relative = projectAnchor(
         projects,
         input.projectId,
         input.worktreeId,
       );
-      if (sibling) {
+      if (relative) {
         anchor = {
-          x: sibling.right + ADJACENCY_GAP,
-          y: sibling.y,
+          x: relative.right + ADJACENCY_GAP,
+          y: relative.y,
+        };
+      } else if (input.viewportRect) {
+        anchor = {
+          x: input.viewportRect.x + (input.viewportRect.w - width) / 2,
+          y: input.viewportRect.y + (input.viewportRect.h - height) / 2,
         };
       } else {
-        const relative = projectAnchor(
-          projects,
-          input.projectId,
-          input.worktreeId,
-        );
-        if (relative) {
-          anchor = {
-            x: relative.right + ADJACENCY_GAP,
-            y: relative.y,
-          };
-        } else if (input.viewportRect) {
-          anchor = {
-            x: input.viewportRect.x + (input.viewportRect.w - width) / 2,
-            y: input.viewportRect.y + (input.viewportRect.h - height) / 2,
-          };
-        } else {
-          anchor = input.fallback ?? { x: 0, y: 0 };
-        }
+        anchor = input.fallback ?? { x: 0, y: 0 };
       }
     }
   }

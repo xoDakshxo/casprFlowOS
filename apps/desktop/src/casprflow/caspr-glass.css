@@ -1,0 +1,309 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   casprOS glass identity
+
+   The model (per the casprOS vision diagram):
+     • The CANVAS is an opaque codex-black rectangle in the CENTRE. It is inset
+       so it sits INSIDE the chrome (below the toolbar, between the rails) — it
+       never lives behind the chrome.
+     • Everything AROUND it — top bar + left rail + right rail — is ONE
+       continuous translucent glass frame. It is transparent to the OUTSIDE
+       (the macOS desktop shows through via the window's native vibrancy), not
+       to the canvas. No CSS backdrop-filter — the native vibrancy is the only
+       blur, so there's no smeary "moving overlay" artifact.
+     • No hard separators between the frame pieces: they share one tint and meet
+       seamlessly, so the surround reads as a single fluid surface.
+
+   Stylelint: background/background-color may only reference a var() or
+   `transparent`, never a literal rgba()/hex. All raw colours live in the custom
+   properties here (exempt) and are consumed through var(). See design-rules.md.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root,
+[data-theme="dark"] {
+  /* Codex-black canvas. Solid/opaque: the centre reads as codex black and the
+     desktop never bleeds into it. */
+  --bg: #131110;
+
+  /* Inner fills, kept DARK + translucent (never white lifts — a white fill
+     behind a translucent panel bleeds up through it as a whitish tone). Cards
+     read as dark wells delineated by the hairline border; only the transient
+     hover gets a faint white lift. */
+  --sidebar: rgba(18, 20, 25, 0.45);
+  --sidebar-hover: rgba(255, 255, 255, 0.05);
+  --surface: rgba(26, 29, 35, 0.5);
+  --surface-hover: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+
+  /* A whisper of casprOS blue — the single accent, for live/focused state. */
+  --accent: #8fb6ff;
+  --accent-soft: rgba(143, 182, 255, 0.16);
+  --accent-foreground: #0d0c0b;
+
+  /* The glass frame tint. Translucent dark so the native vibrancy (blurred
+     desktop) shows through as the "outside", while text stays legible. One tone
+     across toolbar + rails so the surround is a single material. */
+  --glass-frame: rgba(17, 19, 24, 0.55);
+  --glass-rail: rgba(17, 19, 24, 0.55);
+  --glass-toolbar: rgba(17, 19, 24, 0.55);
+  --glass-pane: rgba(20, 22, 27, 0.86); /* modals/drawers/hub — sit over a scrim */
+  --glass-pill: rgba(20, 22, 27, 0.7); /* floating zoom pill */
+
+  --glass-edge: rgba(255, 255, 255, 0.1);
+  --glass-edge-soft: rgba(255, 255, 255, 0.06);
+  /* Agent dock metrics (tokens so the no-raw-px rule stays happy). */
+  --dock-peek: 20px; /* how much of the dock shows when minimised */
+  --dock-rise: 14px; /* offset from the bottom edge when open */
+  --dock-pad-x: 10px;
+  --dock-pad-y: 8px;
+  --dock-row-spacing: clamp(6px, 0.55vw, 12px);
+  --tooltip-bg: rgba(28, 30, 36, 0.96);
+  --caspr-seg-track: rgba(0, 0, 0, 0.22); /* recessed tab-control track */
+  /* Neutral (no blue hue) grey for the active thumb — visible, soft. */
+  --caspr-seg-thumb: rgba(255, 255, 255, 0.09);
+  --caspr-seg-thumb-edge: rgba(255, 255, 255, 0.07);
+  /* Segmented-control metrics. Defined as tokens (exempt from the no-raw-px
+     rule) so the classes can reference fluid clamp()s via var() and still scale
+     with the window. */
+  --seg-track-pad: 3px;
+  --seg-spacing: 2px;
+  --seg-tab-spacing: clamp(4px, 0.4vw, 7px);
+  --seg-tab-pad-y: clamp(5px, 0.5vw, 9px);
+  --seg-tab-pad-x: clamp(6px, 0.6vw, 12px);
+  --seg-tab-font: clamp(11px, calc(9.6px + 0.16vw), 14px);
+  --shadow-color: #050403;
+
+  /* ── Responsive type scale ───────────────────────────────────────────────
+     The ported scale was fixed px, so the UI never breathed with the window —
+     cramped on a big display, tight on a small one. Make it fluid: each step is
+     clamp(min, calc(px + vw), max), tuned so ~1280px ≈ the old size and it
+     grows gently on larger windows. Every cf-* type role reads these, so the
+     whole chrome scales from one place. */
+  --text-tiny: clamp(9.5px, calc(8.2px + 0.1vw), 12px);
+  --text-xs: clamp(10.5px, calc(9.2px + 0.12vw), 13px);
+  --text-sm: clamp(11.5px, calc(10px + 0.16vw), 14px);
+  --text-base: clamp(12.5px, calc(10.6px + 0.18vw), 15.5px);
+  --text-md: clamp(13.5px, calc(11.4px + 0.2vw), 17px);
+  --text-lg: clamp(15px, calc(12.4px + 0.26vw), 20px);
+  --text-xl: clamp(18px, calc(14.8px + 0.42vw), 26px);
+  --text-stat-lg: clamp(20px, calc(16px + 0.5vw), 30px);
+  --text-stat-xl: clamp(23px, calc(18px + 0.6vw), 36px);
+  --text-hero: clamp(28px, calc(21px + 0.85vw), 48px);
+}
+
+/* During a programmatic re-layout (spawn grid / Arrange) tiles glide to their
+   new slots instead of snapping. Scoped to .cf-arranging so normal dragging
+   stays instant. */
+.cf-arranging .react-flow__node {
+  transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Transparent to the OUTSIDE: the window (electron/main.ts) provides the macOS
+   "under-window" vibrancy; body must be transparent so the glass frame shows
+   the blurred desktop through it. The opaque canvas is painted only on its own
+   inset rectangle (.canvas-bg), so the desktop never reaches the centre. */
+html,
+body {
+  background: transparent;
+}
+
+/* The glass frame — one continuous translucent surface. No borders/separators
+   between the pieces so the toolbar and rails read as a single fluid surround;
+   the only tell is a faint top edge line where the frame meets the window. */
+.caspr-rail {
+  background-color: var(--glass-rail);
+}
+
+/* Top title bar — same material as the rails; meets them seamlessly at the
+   corners. A single faint top edge line is the whole "glass" cue. */
+.caspr-toolbar {
+  background-color: var(--glass-toolbar);
+  box-shadow: inset 0 1px 0 var(--glass-edge);
+}
+
+/* ── Segmented tab control (left & right panel headers) ───────────────────────
+   A recessed dark track with a single blended dark-glass THUMB that springs
+   between tabs (the .caspr-seg-thumb is absolutely positioned and translated to
+   the active index). Sizing is fluid (clamp tokens) so it scales with the
+   window on top of the global page zoom. */
+.caspr-seg {
+  display: flex;
+  align-items: center;
+  gap: var(--seg-spacing);
+  padding: var(--seg-track-pad);
+  border-radius: 11px;
+  background-color: var(--caspr-seg-track);
+  box-shadow:
+    inset 0 1px 1px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+/* Holds the tabs + the sliding thumb; equal-width, gapless so the thumb aligns
+   to exact 1/N cells. */
+.caspr-seg-tabs {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: var(--seg-spacing);
+}
+/* Neutral grey indicator, measured to hug the active tab (left/width set inline
+   in px from the rendered button) so its length is always proportionate. Soft
+   edge, no drop shadow. The springy bezier on transform+width gives the slide. */
+.caspr-seg-thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 8px;
+  background-color: var(--caspr-seg-thumb);
+  border: 1px solid var(--caspr-seg-thumb-edge);
+  transition:
+    transform 360ms cubic-bezier(0.34, 1.45, 0.5, 1),
+    width 360ms cubic-bezier(0.34, 1.45, 0.5, 1);
+  pointer-events: none;
+}
+.caspr-seg-tab {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--seg-tab-spacing);
+  border-radius: 8px;
+  padding-block: var(--seg-tab-pad-y);
+  padding-inline: var(--seg-tab-pad-x);
+  font-size: var(--seg-tab-font);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--text-muted);
+  background-color: transparent;
+  border: 0;
+  transition: color 220ms var(--ease-out-soft);
+}
+.caspr-seg-tab:hover {
+  color: var(--text-secondary);
+}
+.caspr-seg-tab[data-active="true"] {
+  color: var(--text-primary);
+}
+
+/* ── Agent dock ───────────────────────────────────────────────────────────────
+   Bottom-centre. Minimised: only a slim handle peeks above the edge. On hover it
+   slides up (springy) to reveal the icons, which magnify toward the cursor. */
+.caspr-dock {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 96;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--dock-pad-y) var(--dock-pad-x);
+  border-radius: 18px;
+  background-color: var(--glass-pill);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-edge),
+    0 18px 48px -12px rgba(0, 0, 0, 0.6);
+  /* Minimised: pushed down so only --dock-peek shows. */
+  transform: translate(-50%, calc(100% - var(--dock-peek)));
+  transition: transform 440ms cubic-bezier(0.22, 1.12, 0.36, 1);
+  overflow: visible;
+}
+.caspr-dock--open {
+  transform: translate(-50%, calc(-1 * var(--dock-rise)));
+}
+/* Extend the hover hit-area down across the gap the dock leaves above the
+   screen edge when open. Without this, sliding the cursor into that gap leaves
+   the element → close → it slides back under the cursor → reopen → flicker.
+   The space stays; it just no longer counts as "outside". */
+.caspr-dock--open::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 28px;
+}
+.caspr-dock-handle {
+  flex: none;
+  width: 34px;
+  height: 4px;
+  margin-bottom: var(--dock-pad-y);
+  border-radius: 999px;
+  background-color: var(--glass-edge);
+  transition: opacity 240ms var(--ease-out-soft);
+}
+.caspr-dock--open .caspr-dock-handle {
+  opacity: 0.45;
+}
+/* Width is set inline (grows with magnification) and stays centred via the
+   dock's translateX(-50%). Items are absolutely positioned so neighbours spread
+   instead of overlapping. While actively tracking the cursor there is NO
+   transition (frame-perfect, fluid like a real dock); the easing is only used
+   to settle back to idle when the cursor leaves. */
+.caspr-dock-row {
+  position: relative;
+  transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.caspr-dock-row.is-tracking {
+  transition: none;
+}
+.caspr-dock-item {
+  position: absolute;
+  bottom: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transform-origin: bottom center;
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    left 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, left;
+}
+.caspr-dock-row.is-tracking .caspr-dock-item {
+  transition: none;
+}
+/* macOS-style tooltip — appears after a ~1s dwell, above the focused icon. */
+.caspr-dock-tip {
+  position: absolute;
+  transform: translateX(-50%);
+  padding: var(--space-1) var(--space-3);
+  border-radius: 8px;
+  background-color: var(--tooltip-bg);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  animation: caspr-tip-in 120ms var(--ease-out-soft);
+}
+@keyframes caspr-tip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+.caspr-dock-item:active {
+  filter: brightness(0.92);
+}
+
+/* Generic floating glass panel (modals / drawers / hub bodies that opt in). */
+.caspr-pane {
+  background-color: var(--glass-pane);
+  border: 1px solid var(--glass-edge-soft);
+  box-shadow:
+    inset 0 1px 0 var(--glass-edge),
+    0 24px 72px rgba(0, 0, 0, 0.5);
+}

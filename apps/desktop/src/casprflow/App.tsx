@@ -3,6 +3,8 @@ import { CanvasRoot } from "./canvas/CanvasRoot";
 import { addProjectFromDirectoryPath } from "./canvas/sceneCommands";
 import { Toolbar } from "./toolbar/Toolbar";
 import { BottomToolbar } from "./toolbar/BottomToolbar";
+import { AgentDock } from "./components/AgentDock";
+import { AppLauncher } from "./components/AppLauncher";
 import { NotificationToast } from "./components/NotificationToast";
 import { LeftPanel } from "./components/LeftPanel";
 import { RightPanel } from "./components/RightPanel";
@@ -453,11 +455,13 @@ export function App() {
   }, []);
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[var(--bg)] text-[var(--text-primary)]">
+    <div className="h-screen w-screen overflow-hidden text-[var(--text-primary)]">
       <Toolbar />
       <LeftPanel />
       <RightPanel />
       <CanvasRoot />
+      <AgentDock />
+      <AppLauncher />
       <BottomToolbar />
       {drawingEnabled && <DrawingPanel />}
       {completionGlowEnabled && <CompletionGlow />}

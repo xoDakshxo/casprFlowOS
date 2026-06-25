@@ -13,6 +13,8 @@ import { pickPlacement } from "../canvas/terminalPlacement";
 import { useCanvasStore } from "../stores/canvasStore";
 import { usePinStore } from "../stores/pinStore";
 import { getVisibleCanvasWorldRect } from "../canvas/viewportBounds";
+import { panToTerminal } from "../utils/panToTerminal";
+import { gridLayoutWorktree } from "../canvas/arrangeActions";
 
 interface CreateTerminalInSceneOptions {
   projectId: string;
@@ -177,7 +179,29 @@ export function createTerminalInScene({
     }
   }
 
-  return addTerminalToScene(projectId, worktreeId, placedTerminal);
+  const created = addTerminalToScene(projectId, worktreeId, placedTerminal);
+
+  if (!position && !parentTerminalId) {
+    // Default spawn (dock / cmd+t): tidy the worktree into a predictable grid
+    // and frame it, so agents fill top-left → down → next column and stay in
+    // view instead of marching off-canvas.
+    gridLayoutWorktree(projectId, worktreeId, placedTerminal.id);
+  } else if (viewportRect) {
+    // Explicit spawn (right-click position / child of a parent): leave the
+    // placement where it landed, just pan it into view if it's off-screen.
+    const fullyVisible =
+      placement.x >= viewportRect.x &&
+      placement.y >= viewportRect.y &&
+      placement.x + baseTerminal.width <= viewportRect.x + viewportRect.w &&
+      placement.y + baseTerminal.height <= viewportRect.y + viewportRect.h;
+    if (!fullyVisible && typeof requestAnimationFrame !== "undefined") {
+      requestAnimationFrame(() =>
+        panToTerminal(placedTerminal.id, { preserveScale: true }),
+      );
+    }
+  }
+
+  return created;
 }
 
 export function focusTerminalInScene(

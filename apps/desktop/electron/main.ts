@@ -780,6 +780,22 @@ const createMainWindow = async (): Promise<void> => {
     window.show();
   });
 
+  // Global responsive UI scale. A true page-level zoom driven by window size so
+  // the whole app — panels, text, AND terminals — scales uniformly and stays
+  // crisp (zoom re-rasterizes, unlike CSS transform). Page zoom is transparent
+  // to layout coordinates, so the canvas pan/zoom/placement math is unaffected.
+  // Anchored to 1.0 at ~1440x900, easing to ~0.9 on small windows and ~1.25 on
+  // large displays — that's the "it was too small on a big screen" fix.
+  const applyResponsiveZoom = () => {
+    if (window.isDestroyed()) return;
+    const { width, height } = window.getContentBounds();
+    const ratio = Math.min(width / 1440, height / 900);
+    const factor = Math.max(0.9, Math.min(1.25, 0.5 + ratio * 0.5));
+    window.webContents.setZoomFactor(factor);
+  };
+  window.webContents.on("did-finish-load", applyResponsiveZoom);
+  window.on("resize", applyResponsiveZoom);
+
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
     await window.loadURL(devServerUrl);

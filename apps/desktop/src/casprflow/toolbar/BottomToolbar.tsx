@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "../stores/canvasStore";
+import { useCanvasToolStore } from "../stores/canvasToolStore";
+import { getCanvasRightInset } from "../canvas/viewportBounds";
 import { usePinStore } from "../stores/pinStore";
 import { usePreferencesStore } from "../stores/preferencesStore";
 import {
@@ -7,6 +9,10 @@ import {
   setZoomToHundred,
   stepZoomAtCenter,
 } from "../canvas/zoomActions";
+import {
+  arrangeFocusedWorktree,
+  type ArrangeLayout,
+} from "../canvas/arrangeActions";
 import {
   clampScale,
   getViewportCenterClientPoint,
@@ -27,8 +33,7 @@ const COMPOSER_BOTTOM_INSET = 16;
 const COMPOSER_FALLBACK_HEIGHT = 120;
 const BOTTOM_OFFSET_PLAIN = 20;
 
-const PILL_BG =
-  "bg-[color-mix(in_srgb,var(--surface)_92%,transparent)] backdrop-blur-md";
+const PILL_BG = "bg-[var(--glass-pill)]";
 const PILL_BORDER = "border border-[var(--border)]";
 const PILL_SHADOW =
   "shadow-[0_8px_24px_-12px_color-mix(in_srgb,var(--shadow-color)_36%,transparent),0_2px_6px_-2px_color-mix(in_srgb,var(--shadow-color)_24%,transparent)]";
@@ -64,6 +69,13 @@ const ZOOM_PRESETS: ZoomPreset[] = [
   { scale: 1, label: "100%", hint: KEY_HINT.zoom100 },
   { scale: 2, label: "200%" },
 ];
+
+const ARRANGE_OPTIONS: { layout: ArrangeLayout; label: string; hint: string }[] =
+  [
+    { layout: "grid", label: "Grid", hint: "▦" },
+    { layout: "columns", label: "Columns", hint: "▥" },
+    { layout: "rows", label: "Rows", hint: "▤" },
+  ];
 
 function useCloseOnOutsideClick(
   open: boolean,
@@ -151,6 +163,11 @@ export function BottomToolbar() {
   const t = useT();
   const viewport = useCanvasStore((s) => s.viewport);
   const composerEnabled = usePreferencesStore((s) => s.composerEnabled);
+  const tool = useCanvasToolStore((s) => s.tool);
+  const setTool = useCanvasToolStore((s) => s.setTool);
+  const rightPanelCollapsed = useCanvasStore((s) => s.rightPanelCollapsed);
+  const rightPanelWidth = useCanvasStore((s) => s.rightPanelWidth);
+  const rightInset = getCanvasRightInset(rightPanelCollapsed, rightPanelWidth);
 
   const [presetOpen, setPresetOpen] = useState(false);
   const presetWrapperRef = useRef<HTMLDivElement>(null);
@@ -172,6 +189,21 @@ export function BottomToolbar() {
     // +1 for the Reset row appended after the presets.
     itemCount: ZOOM_PRESETS.length + 1,
     close: closePresetMenu,
+  });
+
+  const [arrangeOpen, setArrangeOpen] = useState(false);
+  const arrangeWrapperRef = useRef<HTMLDivElement>(null);
+  const arrangePopoverRef = useRef<HTMLDivElement>(null);
+  const arrangeTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeArrangeMenu = useCallback(() => setArrangeOpen(false), []);
+
+  useCloseOnOutsideClick(arrangeOpen, arrangeWrapperRef, closeArrangeMenu);
+  usePopoverKeyboardNav({
+    open: arrangeOpen,
+    popoverRef: arrangePopoverRef,
+    triggerRef: arrangeTriggerRef,
+    itemCount: ARRANGE_OPTIONS.length,
+    close: closeArrangeMenu,
   });
 
   const applyPreset = useCallback((nextScale: number) => {
@@ -219,12 +251,58 @@ export function BottomToolbar() {
 
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 z-[95] pointer-events-none"
-      style={{ bottom: bottomOffset }}
+      className="fixed z-[95] pointer-events-none"
+      style={{ bottom: bottomOffset, right: rightInset + 16 }}
     >
       <div
         className={`pointer-events-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 ${PILL_BG} ${PILL_BORDER} ${PILL_SHADOW}`}
       >
+        <div className={groupBase}>
+          <button
+            className={`${iconButton} ${
+              tool === "select"
+                ? "bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] text-[var(--text-primary)]"
+                : ""
+            }`}
+            onClick={() => setTool("select")}
+            title={"Select"}
+            aria-label={"Select"}
+            aria-pressed={tool === "select"}
+          >
+            {/* Arrow cursor */}
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M3 2.5l9 4.2-3.7 1.2-1.2 3.7L3 2.5z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+          <button
+            className={`${iconButton} ${
+              tool === "hand"
+                ? "bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] text-[var(--text-primary)]"
+                : ""
+            }`}
+            onClick={() => setTool("hand")}
+            title={"Pan"}
+            aria-label={"Pan"}
+            aria-pressed={tool === "hand"}
+          >
+            {/* Hand */}
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M5 7V4.2a1 1 0 012 0V7m0 0V3.2a1 1 0 012 0V7m0 0V4.2a1 1 0 012 0V8m0-1.3a1 1 0 012 0V10c0 2.2-1.8 4-4 4H8.6c-1 0-1.9-.4-2.6-1.1L3.4 10.3a1 1 0 011.3-1.5L6 9.8"
+                stroke="currentColor"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div aria-hidden="true" className={dividerCls} />
+
         <div className={groupBase}>
           <button
             className={iconButton}
@@ -309,6 +387,55 @@ export function BottomToolbar() {
         >
           {t.fit}
         </button>
+
+        <div aria-hidden="true" className={dividerCls} />
+
+        {/* Window arranger — tidy the focused worktree into a layout. */}
+        <div className="relative" ref={arrangeWrapperRef}>
+          <button
+            ref={arrangeTriggerRef}
+            className={iconButton}
+            onClick={() => setArrangeOpen((p) => !p)}
+            title="Arrange windows"
+            aria-label="Arrange windows"
+            aria-haspopup="menu"
+            aria-expanded={arrangeOpen}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="5" height="5" rx="1.2" fill="currentColor" />
+              <rect x="9" y="2" width="5" height="5" rx="1.2" fill="currentColor" />
+              <rect x="2" y="9" width="5" height="5" rx="1.2" fill="currentColor" />
+              <rect x="9" y="9" width="5" height="5" rx="1.2" fill="currentColor" />
+            </svg>
+          </button>
+          {arrangeOpen && (
+            <div
+              ref={arrangePopoverRef}
+              role="menu"
+              aria-label="Arrange windows"
+              className={`absolute bottom-full right-0 mb-2 min-w-[150px] rounded-md py-1 ${PILL_BG} ${PILL_BORDER} ${PILL_SHADOW}`}
+            >
+              {ARRANGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.layout}
+                  data-popover-item
+                  role="menuitem"
+                  tabIndex={-1}
+                  className="flex w-full items-center justify-between px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] focus:bg-[color-mix(in_srgb,var(--surface)_72%,transparent)] hover:text-[var(--text-primary)] focus:text-[var(--text-primary)] focus:outline-none"
+                  onClick={() => {
+                    arrangeFocusedWorktree(opt.layout);
+                    closeArrangeMenu();
+                  }}
+                >
+                  <span>{opt.label}</span>
+                  <span className="text-[12px] text-[var(--text-muted)]">
+                    {opt.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
