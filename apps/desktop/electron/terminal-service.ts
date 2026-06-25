@@ -7,6 +7,11 @@ export interface TerminalCreateInput {
   readonly cwd: string;
   readonly cols: number;
   readonly rows: number;
+  readonly shell?: string;
+  readonly args?: readonly string[];
+  readonly terminalId?: string;
+  readonly theme?: "dark" | "light";
+  readonly casprFlowOSPtyId?: number;
 }
 
 export interface TerminalCreateResult {
@@ -48,11 +53,14 @@ export class TerminalService {
   async create(input: TerminalCreateInput, owner: WebContents): Promise<TerminalCreateResult> {
     const id = `pty:${this.#nextTerminalId}`;
     this.#nextTerminalId += 1;
-    const launch = await buildLaunchSpec({
+    const launchOptions = {
       cwd: input.cwd,
-      terminalId: id,
-      theme: "dark",
-    });
+      terminalId: input.terminalId ?? id,
+      theme: input.theme ?? "dark",
+      ...(input.shell ? { shell: input.shell } : {}),
+      ...(input.args ? { args: input.args } : {}),
+    };
+    const launch = await buildLaunchSpec(launchOptions);
 
     let terminal: pty.IPty | null = null;
     let lastError: unknown = null;
@@ -90,12 +98,12 @@ export class TerminalService {
     // The window can be torn down (quit/close) while pty data is still draining.
     // isDestroyed() can race with the actual teardown, so also guard with try/catch
     // — an uncaught throw here would crash the whole app.
-    const safeSend = (channel: string, payload: unknown): void => {
+    const safeSend = (channel: string, ...payload: readonly unknown[]): void => {
       if (owner.isDestroyed()) {
         return;
       }
       try {
-        owner.send(channel, payload);
+        owner.send(channel, ...payload);
       } catch {
         // webContents went away mid-send; nothing to do.
       }
@@ -103,9 +111,15 @@ export class TerminalService {
 
     terminal.onData((data) => {
       safeSend("terminal:data", { id, data });
+      if (typeof input.casprFlowOSPtyId === "number") {
+        safeSend("terminal:output", input.casprFlowOSPtyId, data);
+      }
     });
     terminal.onExit(({ exitCode, signal }) => {
       safeSend("terminal:exit", { id, exitCode, signal });
+      if (typeof input.casprFlowOSPtyId === "number") {
+        safeSend("terminal:exit", input.casprFlowOSPtyId, exitCode);
+      }
       this.#terminals.delete(id);
     });
 

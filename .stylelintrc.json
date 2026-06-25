@@ -13,7 +13,7 @@
       }
     ]
   },
-  "ignoreFiles": ["**/dist/**", "**/node_modules/**"],
+  "ignoreFiles": ["**/dist/**", "**/node_modules/**", "apps/desktop/src/casprflow/index.css"],
   "overrides": [
     {
       "files": ["packages/ui/src/tokens.css"],
