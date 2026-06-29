@@ -1,8 +1,5 @@
 import type { Viewport } from "../types";
-import {
-  COLLAPSED_TAB_WIDTH,
-  PIN_DRAWER_WIDTH,
-} from "../stores/canvasStore";
+import { PIN_DRAWER_WIDTH } from "../stores/canvasStore";
 
 // The canvas container is inset below the top toolbar (it no longer lives
 // behind the chrome), so window↔world Y conversions must subtract/add the
@@ -13,11 +10,14 @@ const CANVAS_TOP_OFFSET = 44;
 // The right panel hosts the code-navigation tabs (Files / Diff /
 // Git / Memory). Canvas placement math needs to exclude its
 // footprint so terminals don't spawn underneath it.
+// A panel only insets the canvas when it is PINNED (clicked open). When it is
+// collapsed it is either hidden or shown as a hover-preview overlay that floats
+// over the canvas — neither reserves any width, so the canvas runs full-bleed.
 export function getCanvasRightInset(
   rightPanelCollapsed: boolean,
   rightPanelWidth: number,
 ) {
-  return rightPanelCollapsed ? COLLAPSED_TAB_WIDTH : rightPanelWidth;
+  return rightPanelCollapsed ? 0 : rightPanelWidth;
 }
 
 export function getCanvasLeftInset(
@@ -25,7 +25,7 @@ export function getCanvasLeftInset(
   leftPanelWidth: number,
   taskDrawerOpen: boolean,
 ) {
-  const panel = leftPanelCollapsed ? COLLAPSED_TAB_WIDTH : leftPanelWidth;
+  const panel = leftPanelCollapsed ? 0 : leftPanelWidth;
   return panel + (taskDrawerOpen ? PIN_DRAWER_WIDTH : 0);
 }
 

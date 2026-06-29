@@ -57,8 +57,13 @@
   --shadow-hud: 0 12px 36px rgba(0, 0, 0, 0.5);
   --shadow-focus: 0 22px 72px rgba(0, 0, 0, 0.58), 0 0 0 1px var(--focus-ring);
   --radius-pane: 16px;
-  --radius-tile: 12px;
+  --radius-tile: 20px;
   --radius-pill: 999px;
+
+  --canvas-resize-handle-size: 16px;
+  --canvas-resize-edge-length: 36px;
+  --canvas-resize-edge-thickness: 10px;
+  --motion-resize-hint: 1.1s;
 
   /* Fixed spacing scale — for hairlines, icon gaps, and fine details only. */
   --space-1: 4px;

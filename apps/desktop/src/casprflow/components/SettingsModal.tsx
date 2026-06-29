@@ -1189,7 +1189,6 @@ export function SettingsModal({ onClose }: Props) {
                     <ChoiceSegment
                       value={terminalRenderer}
                       options={[
-                        { value: "webgl", label: t.terminal_renderer_webgl },
                         { value: "dom", label: t.terminal_renderer_dom },
                       ]}
                       onChange={(v) => setTerminalRenderer(v)}

@@ -6,7 +6,8 @@ import {
   useEffect,
   useLayoutEffect,
 } from "react";
-import { useCanvasStore, COLLAPSED_TAB_WIDTH } from "../stores/canvasStore";
+import { useCanvasStore } from "../stores/canvasStore";
+import { usePanelHoverStore } from "../stores/panelHoverStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useTerminalRuntimeStore } from "../terminal/terminalRuntimeStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -270,7 +271,15 @@ export function LeftPanel() {
   // two states is ever in the DOM, so there are no persistent
   // compositor layers that can get stuck unpainted after a
   // foreground/background switch.
-  const displayedWidth = collapsed ? COLLAPSED_TAB_WIDTH : width;
+  // pinned = clicked open (insets canvas, glass bg). preview = hover overlay
+  // (floats over the canvas, opaque bg, auto-closes). Visible when either.
+  const pinned = !collapsed;
+  const preview = usePanelHoverStore((s) => s.leftPreview);
+  const openPreview = usePanelHoverStore((s) => s.openPreview);
+  const closePreviewSoon = usePanelHoverStore((s) => s.closePreviewSoon);
+  const visible = pinned || preview;
+  const isOverlay = preview && !pinned;
+  const displayedWidth = visible ? width : 0;
   const widthTransition = dragging
     ? undefined
     : "width 240ms cubic-bezier(0.22, 0.61, 0.36, 1)";
@@ -295,76 +304,19 @@ export function LeftPanel() {
       <PinDrawer />
       <div
         className="caspr-rail caspr-rail--left fixed left-0 z-40 overflow-hidden"
+        data-overlay={isOverlay ? "true" : undefined}
         style={{
           top: 44,
           height: "calc(100vh - 44px)",
           width: displayedWidth,
           transition: widthTransition,
         }}
+        onMouseEnter={() => openPreview("left")}
+        onMouseLeave={() => closePreviewSoon("left")}
       >
-        {collapsed ? (
-          // Collapsed strip — keep the same tab affordance as the right panel.
-          <div
-            className="cf-row-hover absolute inset-y-0 left-0 flex flex-col items-center pt-3 gap-1 cursor-pointer"
-            style={{ width: COLLAPSED_TAB_WIDTH }}
-            onClick={() => setCollapsed(false)}
-            title={t.left_panel_sessions}
-          >
-            {LEFT_TAB_CONFIG.map(({ id, icon: Icon, labelKey }) => (
-              <button
-                key={id}
-                className={`cf-row-icon flex items-center justify-center w-6 h-6 rounded-md ${
-                  activeTab === id
-                    ? "text-[var(--accent)]"
-                    : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-                }`}
-                title={t[labelKey]}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveTab(id);
-                  setCollapsed(false);
-                }}
-              >
-                <Icon size={14} />
-              </button>
-            ))}
-            <button
-              className="cf-row-icon flex items-center justify-center w-6 h-6 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50"
-              disabled={addingProject}
-              onClick={(e) => {
-                e.stopPropagation();
-                setActiveTab("sessions");
-                setCollapsed(false);
-                void handleAddProject();
-              }}
-              title={t.shortcut_add_project}
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path
-                  d="M6 2V10M2 6H10"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-            <div className="mt-auto mb-3 pointer-events-none">
-              <div className="flex items-center justify-center w-6 h-6 rounded-md text-[var(--text-muted)]">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path
-                    d="M3 2L7 5L3 8"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
-        ) : (
-          // Expanded surface — laid out at the user-configured width so
-          // content does not reflow while the outer width animates;
+        {
+          // Expanded surface — always mounted; laid out at the user-configured
+          // width so content does not reflow while the outer width animates;
           // the outer overflow-hidden clips it during the transition.
           <div
             className="absolute inset-y-0 left-0 flex flex-col"
@@ -479,7 +431,7 @@ export function LeftPanel() {
               />
             </div>
           </div>
-        )}
+        }
       </div>
     </>
   );

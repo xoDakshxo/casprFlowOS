@@ -14,6 +14,7 @@ export const DEFAULT_SPAN: Record<TerminalType, { cols: number; rows: number }> 
   wuu: { cols: 1, rows: 1 },
   lazygit: { cols: 1, rows: 1 },
   tmux: { cols: 1, rows: 1 },
+  browser: { cols: 1, rows: 1 },
 };
 
 export function withUpdatedTerminalType(

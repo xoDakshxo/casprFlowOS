@@ -192,6 +192,7 @@ const TYPE_GLYPH_LETTER: Record<TerminalType, string> = {
   wuu: "W",
   lazygit: "g",
   tmux: "T",
+  browser: "B",
 };
 
 interface SparklineProps {

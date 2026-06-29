@@ -1,18 +1,18 @@
 import { create } from "zustand";
-import type { TerminalType } from "../types";
+import type { AppId } from "../types";
 
 /**
  * Which apps are pinned to the AgentDock. Persisted to localStorage so the
  * user's dock survives restarts. Pinned from the App Launcher.
  */
 const STORAGE_KEY = "casprflowos.dock.pinned";
-const DEFAULT_PINNED: TerminalType[] = ["claude", "codex", "gemini", "shell"];
+const DEFAULT_PINNED: AppId[] = ["claude", "codex", "gemini", "shell", "browser"];
 
-function load(): TerminalType[] {
+function load(): AppId[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as TerminalType[];
+      const parsed = JSON.parse(raw) as AppId[];
       if (Array.isArray(parsed)) return parsed;
     }
   } catch {
@@ -21,7 +21,7 @@ function load(): TerminalType[] {
   return DEFAULT_PINNED;
 }
 
-function persist(pinned: TerminalType[]): void {
+function persist(pinned: AppId[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(pinned));
   } catch {
@@ -30,8 +30,8 @@ function persist(pinned: TerminalType[]): void {
 }
 
 interface DockStore {
-  pinned: TerminalType[];
-  togglePinned: (type: TerminalType) => void;
+  pinned: AppId[];
+  togglePinned: (type: AppId) => void;
 }
 
 export const useDockStore = create<DockStore>((set) => ({

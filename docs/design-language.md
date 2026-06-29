@@ -12,7 +12,7 @@
 2. **Glass is for chrome, never content.** Rails, panes, the voice HUD, modals, and
    connector surfaces use glass / gradient-glass. Terminal text and diffs stay crisp and
    opaque-enough to read. Glass frames content; it never sits on top of text you must read.
-3. **Translucency with restraint.** Terminals are *translucent surfaces* (you sense the
+3. **Translucency with restraint.** Terminals are _translucent surfaces_ (you sense the
    canvas behind them) but text legibility wins every time — clamp background opacity so
    contrast never drops below WCAG AA for terminal foreground text.
 4. **The canvas is themeable.** Replace TermCanvas's fixed dotted grid with a small set of
@@ -30,47 +30,53 @@ taste, but keep the structure (base / surface / glass / text / accent / semantic
 ```css
 :root {
   /* base plane */
-  --bg-void:        #07080b;   /* deepest background, behind the canvas */
-  --bg-base:        #0b0d12;   /* app base */
-  --bg-raised:      #11141b;   /* raised opaque surfaces */
+  --bg-void: #07080b; /* deepest background, behind the canvas */
+  --bg-base: #0b0d12; /* app base */
+  --bg-raised: #11141b; /* raised opaque surfaces */
 
   /* glass surfaces (use with backdrop-filter: blur) */
-  --glass-rail:     rgba(18, 21, 28, 0.55);
-  --glass-pane:     rgba(22, 26, 34, 0.50);
-  --glass-hud:      rgba(20, 24, 32, 0.62);
-  --glass-stroke:   rgba(255, 255, 255, 0.08);   /* 1px hairline border */
+  --glass-rail: rgba(18, 21, 28, 0.55);
+  --glass-pane: rgba(22, 26, 34, 0.5);
+  --glass-hud: rgba(20, 24, 32, 0.62);
+  --glass-stroke: rgba(255, 255, 255, 0.08); /* 1px hairline border */
   --glass-stroke-strong: rgba(255, 255, 255, 0.14);
 
   /* gradient-glass (top-light, used on rails/panes) */
   --glass-gradient: linear-gradient(
-                      180deg,
-                      rgba(255,255,255,0.06) 0%,
-                      rgba(255,255,255,0.00) 28%
-                    );
+    180deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0) 28%
+  );
 
   /* text */
-  --text-primary:   rgba(237, 240, 245, 0.95);
+  --text-primary: rgba(237, 240, 245, 0.95);
   --text-secondary: rgba(237, 240, 245, 0.62);
-  --text-muted:     rgba(237, 240, 245, 0.38);
+  --text-muted: rgba(237, 240, 245, 0.38);
 
   /* accent (single brand color — pull exact hue from casprFlow logo) */
-  --accent:         #6ea8ff;   /* placeholder; reconcile with logo navy/blue */
-  --accent-soft:    rgba(110, 168, 255, 0.16);
-  --focus-ring:     rgba(110, 168, 255, 0.55);
+  --accent: #6ea8ff; /* placeholder; reconcile with logo navy/blue */
+  --accent-soft: rgba(110, 168, 255, 0.16);
+  --focus-ring: rgba(110, 168, 255, 0.55);
 
   /* semantic (diff + status) */
-  --diff-add:       #3fb950;
-  --diff-del:       #f85149;
+  --diff-add: #3fb950;
+  --diff-del: #f85149;
   --status-running: #d8a657;
-  --status-done:    #3fb950;
-  --status-error:   #f85149;
+  --status-done: #3fb950;
+  --status-error: #f85149;
 
   /* depth */
-  --shadow-pane:    0 18px 48px rgba(0,0,0,0.45);
-  --shadow-hud:     0 12px 36px rgba(0,0,0,0.50);
-  --radius-pane:    16px;
-  --radius-tile:    12px;
-  --radius-pill:    999px;
+  --shadow-pane: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --shadow-hud: 0 12px 36px rgba(0, 0, 0, 0.5);
+  --radius-pane: 16px;
+  --radius-tile: 20px;
+  --radius-pill: 999px;
+
+  /* canvas window resize controls */
+  --canvas-resize-handle-size: 16px;
+  --canvas-resize-edge-length: 36px;
+  --canvas-resize-edge-thickness: 10px;
+  --motion-resize-hint: 1.1s;
 }
 ```
 
@@ -116,13 +122,13 @@ A reusable surface treatment (implement as a `.glass` utility / styled primitive
 Ship a small curated set in `assets/themes/`, user-switchable from the right rail. Each
 theme is just a background layer spec (no effect on tiles/rails):
 
-| Theme | Background |
-|---|---|
-| **Void** (default) | radial dark gradient, near-black center to `--bg-void` edges |
-| **Grid** | faint 1px line grid on `--bg-base` (the "classic", muted) |
-| **Dots** | subtle dot matrix (TermCanvas-style, but dimmer) |
-| **Aurora** | very slow, very dim gradient-glass aurora drift (motion off by default) |
-| **Carbon** | flat matte with a barely-there noise texture |
+| Theme              | Background                                                              |
+| ------------------ | ----------------------------------------------------------------------- |
+| **Void** (default) | radial dark gradient, near-black center to `--bg-void` edges            |
+| **Grid**           | faint 1px line grid on `--bg-base` (the "classic", muted)               |
+| **Dots**           | subtle dot matrix (TermCanvas-style, but dimmer)                        |
+| **Aurora**         | very slow, very dim gradient-glass aurora drift (motion off by default) |
+| **Carbon**         | flat matte with a barely-there noise texture                            |
 
 Theme = `{ id, name, layer: 'gradient'|'grid'|'dots'|'aurora'|'flat', params }`. Keep the
 contract small so adding a theme is data, not code.

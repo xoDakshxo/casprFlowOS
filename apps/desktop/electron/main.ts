@@ -750,7 +750,8 @@ const createMainWindow = async (): Promise<void> => {
     // An opaque backgroundColor here would bury the glass effect entirely.
     backgroundColor: "#00000000",
     show: false,
-    title: "casprFlowOS",
+    title: "casprOS",
+    icon: path.join(dirname, "../resources/casprlogo.png"),
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 16, y: 16 },
     vibrancy: "under-window",
@@ -760,6 +761,9 @@ const createMainWindow = async (): Promise<void> => {
       nodeIntegration: false,
       preload: path.join(dirname, "preload.cjs"),
       sandbox: true,
+      // Enables the <webview> tag used by the in-app browser (right-panel
+      // Browser tab + canvas browser cards).
+      webviewTag: true,
     },
   });
   mainWindow = window;
@@ -792,9 +796,49 @@ const createMainWindow = async (): Promise<void> => {
     const ratio = Math.min(width / 1440, height / 900);
     const factor = Math.max(0.9, Math.min(1.25, 0.5 + ratio * 0.5));
     window.webContents.setZoomFactor(factor);
+    pushToolbarMetrics();
+  };
+
+  // The macOS traffic lights sit at a fixed SCREEN position (16px) and are NOT
+  // affected by the page zoom — but the toolbar IS. So a fixed CSS gutter (and
+  // the toolbar's vertical centring) drift away from the lights as the zoom
+  // changes. Compute both the left gutter and a vertical nudge here, where the
+  // zoom + fullscreen state are known, and push the exact CSS values. In
+  // fullscreen the lights are hidden, so the gutter collapses and the nudge is 0.
+  const TRAFFIC_LIGHT_INSET = 88; // screen px: clears the 3 stoplights + an even gap
+  const TOOLBAR_HALF = 22; // css px: half of the h-11 (44px) toolbar
+  const LIGHT_HALF = 6; // half the stoplight height (y:16 centres them at zoom 1)
+  const pushToolbarMetrics = () => {
+    if (window.isDestroyed()) return;
+    const zoom = window.webContents.getZoomFactor() || 1;
+    const fs = window.isFullScreen();
+    const left = fs ? 12 : Math.ceil(TRAFFIC_LIGHT_INSET / zoom);
+    window.webContents.send("window:toolbar-metrics", { left });
+    // The toolbar + its icons are zoomed but the native traffic lights are NOT,
+    // so at zoom ≠ 1 the lights drift off the toolbar's centre line. Move the
+    // lights ONTO that line so the whole top bar reads as a single row.
+    if (process.platform === "darwin" && !fs) {
+      const y = Math.max(0, Math.round(TOOLBAR_HALF * zoom - LIGHT_HALF));
+      try {
+        window.setWindowButtonPosition({ x: 16, y });
+      } catch {
+        // Older Electron: fall back to the deprecated alias.
+        (
+          window as unknown as {
+            setTrafficLightPosition?: (p: { x: number; y: number }) => void;
+          }
+        ).setTrafficLightPosition?.({ x: 16, y });
+      }
+    }
   };
   window.webContents.on("did-finish-load", applyResponsiveZoom);
   window.on("resize", applyResponsiveZoom);
+
+  // Recompute the toolbar gutter when the lights appear/disappear or the page
+  // first loads (resize is already covered via applyResponsiveZoom).
+  window.on("enter-full-screen", pushToolbarMetrics);
+  window.on("leave-full-screen", pushToolbarMetrics);
+  window.webContents.on("did-finish-load", pushToolbarMetrics);
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
   if (devServerUrl) {
@@ -805,10 +849,19 @@ const createMainWindow = async (): Promise<void> => {
   await window.loadFile(path.join(dirname, "../dist/index.html"));
 };
 
-app.setName("casprFlowOS");
+app.setName("casprOS");
 registerIpcHandlers();
 
 void app.whenReady().then(async () => {
+  // Dock icon (macOS dev): replace the default blue Electron icon with the
+  // casprOS mark. Packaged builds use the bundle icon.
+  if (process.platform === "darwin" && app.dock) {
+    try {
+      app.dock.setIcon(path.join(dirname, "../resources/casprlogo.png"));
+    } catch {
+      // non-fatal
+    }
+  }
   await createMainWindow();
 
   app.on("activate", () => {

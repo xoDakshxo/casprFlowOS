@@ -920,7 +920,9 @@ export function FilesContent({ worktreePath, onFileClick }: Props) {
           minHeight: 0,
           // Map casprFlowOS CSS variables into @pierre/trees shadow DOM via
           // inherited custom properties.
-          ["--trees-theme-sidebar-bg" as string]: "var(--surface)",
+          // Transparent so the rail's frosted glass shows through uniformly
+          // (no extra dark block behind the tree — matches the Diff/Git tabs).
+          ["--trees-theme-sidebar-bg" as string]: "transparent",
           ["--trees-theme-sidebar-fg" as string]: "var(--text-primary)",
           ["--trees-theme-sidebar-header-fg" as string]: "var(--text-secondary)",
           ["--trees-theme-sidebar-border" as string]: "var(--border)",

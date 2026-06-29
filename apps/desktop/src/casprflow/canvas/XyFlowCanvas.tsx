@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
-  Background,
   ReactFlow,
   ReactFlowProvider,
   useNodesState,
@@ -20,6 +20,7 @@ import { CanvasEmptyState } from "../components/CanvasEmptyState";
 import { useCanvasDragOver } from "./useCanvasDragOver";
 import { getStashedTerminalIds } from "./sceneState";
 import { useProjectStore } from "../stores/projectStore";
+import { useSettingsModalStore } from "../stores/settingsModalStore";
 import { useCanvasStore } from "../stores/canvasStore";
 import { usePinStore } from "../stores/pinStore";
 import { useDrawingStore } from "../stores/drawingStore";
@@ -35,7 +36,6 @@ import { useT } from "../i18n/useT";
 import { FamilyTreeOverlay } from "../components/FamilyTreeOverlay";
 import { FocusCaretOverlay } from "../components/FocusCaretOverlay";
 import { BoxSelectOverlay } from "./BoxSelectOverlay";
-import { CanvasCardLayer } from "./CanvasCardLayer";
 import { DrawingLayer } from "./DrawingLayer";
 import { PetOverlay } from "../pet/PetOverlay";
 import { useBoxSelect } from "../hooks/useBoxSelect";
@@ -71,6 +71,14 @@ import type { TerminalType } from "../types";
 const EMPTY_EDGES: never[] = [];
 const WHEEL_ZOOM_SENSITIVITY = 0.005;
 const SNAP_GRID: [number, number] = [10, 10];
+const CANVAS_LIVE_WALLPAPER_URL = new URL(
+  "../../../../../assets/themes/canvasWallpapers/narutoLiveWallpaper.mp4",
+  import.meta.url,
+).href;
+const CANVAS_WALLPAPER_POSTER_URL = new URL(
+  "../../../../../assets/themes/canvasWallpapers/canvasWallpaperBlueSea.jpg",
+  import.meta.url,
+).href;
 
 function normalizeWheelDelta(event: React.WheelEvent): number {
   switch (event.deltaMode) {
@@ -88,9 +96,7 @@ function normalizeWheelDelta(event: React.WheelEvent): number {
  * In the flat canvas model, each terminal's own position and size
  * determines the layout (no project/worktree container offsets).
  */
-function buildLayoutKey(
-  projects: ReturnType<typeof useProjectStore.getState>["projects"],
-) {
+function buildLayoutKey(projects: ReturnType<typeof useProjectStore.getState>["projects"]) {
   return projects
     .map((project) =>
       [
@@ -137,12 +143,15 @@ function TerminalRuntimeLayer({
     () =>
       projects.flatMap((project) =>
         project.worktrees.flatMap((worktree) =>
-          worktree.terminals.map((terminal) => ({
-            projectId: project.id,
-            terminal,
-            worktreeId: worktree.id,
-            worktreePath: worktree.path,
-          })),
+          worktree.terminals
+            // Browser windows have no shell runtime — they render a webview.
+            .filter((terminal) => terminal.type !== "browser")
+            .map((terminal) => ({
+              projectId: project.id,
+              terminal,
+              worktreeId: worktree.id,
+              worktreePath: worktree.path,
+            })),
         ),
       ),
     [projects],
@@ -154,7 +163,7 @@ function TerminalRuntimeLayer({
       projects.flatMap((project) =>
         project.worktrees.flatMap((worktree) =>
           worktree.terminals
-            .filter((t) => !t.stashed)
+            .filter((t) => !t.stashed && t.type !== "browser")
             .map((terminal) => ({
               absoluteRect: {
                 x: terminal.x,
@@ -218,13 +227,12 @@ function TerminalRuntimeLayer({
   }, [terminalEntries]);
 
   useEffect(() => {
-    const visibleEntryIds = new Set(
-      terminalEntries.map((entry) => entry.terminal.id),
-    );
+    const visibleEntryIds = new Set(terminalEntries.map((entry) => entry.terminal.id));
 
     for (const project of projects) {
       for (const worktree of project.worktrees) {
         for (const terminal of worktree.terminals) {
+          if (terminal.type === "browser") continue;
           if (!visibleEntryIds.has(terminal.id)) {
             setTerminalRuntimeMode(terminal.id, "parked", {
               caller: "TerminalRuntimeLayer.visibilityEffect",
@@ -294,34 +302,22 @@ function XyFlowCanvasInner() {
   const t = useT();
   const viewport = useCanvasStore((state) => state.viewport);
   const isAnimating = useCanvasStore((state) => state.isAnimating);
-  const rightPanelCollapsed = useCanvasStore(
-    (state) => state.rightPanelCollapsed,
-  );
-  const leftPanelCollapsed = useCanvasStore(
-    (state) => state.leftPanelCollapsed,
-  );
+  const rightPanelCollapsed = useCanvasStore((state) => state.rightPanelCollapsed);
+  const leftPanelCollapsed = useCanvasStore((state) => state.leftPanelCollapsed);
   const leftPanelWidth = useCanvasStore((state) => state.leftPanelWidth);
   const rightPanelWidth = useCanvasStore((state) => state.rightPanelWidth);
-  const taskDrawerOpen = usePinStore(
-    (state) => state.openProjectPath !== null,
-  );
+  const taskDrawerOpen = usePinStore((state) => state.openProjectPath !== null);
   const projects = useProjectStore((state) => state.projects);
   const drawingEnabled = usePreferencesStore((state) => state.drawingEnabled);
   const petEnabled = usePreferencesStore((state) => state.petEnabled);
-  const activityHeatmapEnabled = usePreferencesStore(
-    (state) => state.activityHeatmapEnabled,
-  );
+  const activityHeatmapEnabled = usePreferencesStore((state) => state.activityHeatmapEnabled);
   const animationBlur = usePreferencesStore((state) => state.animationBlur);
   const drawingTool = useDrawingStore((state) => state.tool);
   const canvasTool = useCanvasToolStore((state) => state.tool);
   const spaceHeld = useCanvasToolStore((state) => state.spaceHeld);
   const { handleMouseDown: handleBoxSelectMouseDown } = useBoxSelect();
   const layoutKey = useMemo(() => buildLayoutKey(projects), [projects]);
-  const leftOffset = getCanvasLeftInset(
-    leftPanelCollapsed,
-    leftPanelWidth,
-    taskDrawerOpen,
-  );
+  const leftOffset = getCanvasLeftInset(leftPanelCollapsed, leftPanelWidth, taskDrawerOpen);
   const rightOffset = getCanvasRightInset(rightPanelCollapsed, rightPanelWidth);
   const arranging = useArrangingStore((s) => s.arranging);
   const sidebarDragging = useSidebarDragStore((s) => s.active);
@@ -386,12 +382,8 @@ function XyFlowCanvasInner() {
     [contextMenu],
   );
 
-  const projectedNodes = useMemo(
-    () => buildCanvasFlowNodes(projects),
-    [layoutKey],
-  );
-  const [nodes, setNodes, onNodesChange] =
-    useNodesState<CanvasFlowNode>(projectedNodes);
+  const projectedNodes = useMemo(() => buildCanvasFlowNodes(projects), [layoutKey]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<CanvasFlowNode>(projectedNodes);
 
   useEffect(() => {
     setNodes(projectedNodes);
@@ -404,30 +396,25 @@ function XyFlowCanvasInner() {
     [],
   );
 
-  const handleInit = useCallback(
-    (reactFlow: ReactFlowInstance<CanvasFlowNode>) => {
-      useCanvasStore.getState().registerViewportAdapter({
-        setViewport: (nextViewport, options) => {
-          void reactFlow.setViewport(
-            {
-              x: nextViewport.x,
-              y: nextViewport.y,
-              zoom: nextViewport.scale,
-            },
-            options,
-          );
-        },
-        getViewport: () => {
-          const current = reactFlow.getViewport();
-          return fromFlowViewport(current);
-        },
-      });
-      useCanvasStore
-        .getState()
-        .syncViewportFromRenderer(fromFlowViewport(reactFlow.getViewport()));
-    },
-    [],
-  );
+  const handleInit = useCallback((reactFlow: ReactFlowInstance<CanvasFlowNode>) => {
+    useCanvasStore.getState().registerViewportAdapter({
+      setViewport: (nextViewport, options) => {
+        void reactFlow.setViewport(
+          {
+            x: nextViewport.x,
+            y: nextViewport.y,
+            zoom: nextViewport.scale,
+          },
+          options,
+        );
+      },
+      getViewport: () => {
+        const current = reactFlow.getViewport();
+        return fromFlowViewport(current);
+      },
+    });
+    useCanvasStore.getState().syncViewportFromRenderer(fromFlowViewport(reactFlow.getViewport()));
+  }, []);
 
   const handleMove = useCallback<OnMove>(
     (_event, nextViewport) => {
@@ -490,57 +477,46 @@ function XyFlowCanvasInner() {
     // No-op in flat canvas — no bringToFront needed
   }, []);
 
-  const handleNodeDragStop = useCallback<OnNodeDrag<CanvasFlowNode>>(
-    (_event, node) => {
-      // Write terminal position back to store
-      const { projectId, worktreeId, terminalId } = node.data;
-      const snappedX =
-        Math.round(node.position.x / SNAP_GRID[0]) * SNAP_GRID[0];
-      const snappedY =
-        Math.round(node.position.y / SNAP_GRID[1]) * SNAP_GRID[1];
-      useProjectStore
-        .getState()
-        .updateTerminalPosition(
-          projectId,
-          worktreeId,
-          terminalId,
-          snappedX,
-          snappedY,
-        );
+  const handleNodeDragStop = useCallback<OnNodeDrag<CanvasFlowNode>>((_event, node) => {
+    // Write terminal position back to store
+    const { projectId, worktreeId, terminalId } = node.data;
+    const snappedX = Math.round(node.position.x / SNAP_GRID[0]) * SNAP_GRID[0];
+    const snappedY = Math.round(node.position.y / SNAP_GRID[1]) * SNAP_GRID[1];
+    useProjectStore
+      .getState()
+      .updateTerminalPosition(projectId, worktreeId, terminalId, snappedX, snappedY);
 
-      // Resolve collisions after drag
-      const allProjects = useProjectStore.getState().projects;
-      const allRects = allProjects.flatMap((p) =>
-        p.worktrees.flatMap((w) =>
-          w.terminals
-            .filter((t) => !t.stashed)
-            .map((t) => ({
-              id: t.id,
-              x: t.id === terminalId ? snappedX : t.x,
-              y: t.id === terminalId ? snappedY : t.y,
-              width: t.width,
-              height: t.height,
-            })),
-        ),
-      );
-      const resolved = resolveCollisions(allRects, 8, terminalId);
-      const updatePos = useProjectStore.getState().updateTerminalPosition;
-      for (const rect of resolved) {
-        if (rect.id === terminalId) continue;
-        const original = allRects.find((r) => r.id === rect.id);
-        if (original && (original.x !== rect.x || original.y !== rect.y)) {
-          for (const p of allProjects) {
-            for (const w of p.worktrees) {
-              if (w.terminals.some((t) => t.id === rect.id)) {
-                updatePos(p.id, w.id, rect.id, rect.x, rect.y);
-              }
+    // Resolve collisions after drag
+    const allProjects = useProjectStore.getState().projects;
+    const allRects = allProjects.flatMap((p) =>
+      p.worktrees.flatMap((w) =>
+        w.terminals
+          .filter((t) => !t.stashed)
+          .map((t) => ({
+            id: t.id,
+            x: t.id === terminalId ? snappedX : t.x,
+            y: t.id === terminalId ? snappedY : t.y,
+            width: t.width,
+            height: t.height,
+          })),
+      ),
+    );
+    const resolved = resolveCollisions(allRects, 8, terminalId);
+    const updatePos = useProjectStore.getState().updateTerminalPosition;
+    for (const rect of resolved) {
+      if (rect.id === terminalId) continue;
+      const original = allRects.find((r) => r.id === rect.id);
+      if (original && (original.x !== rect.x || original.y !== rect.y)) {
+        for (const p of allProjects) {
+          for (const w of p.worktrees) {
+            if (w.terminals.some((t) => t.id === rect.id)) {
+              updatePos(p.id, w.id, rect.id, rect.x, rect.y);
             }
           }
         }
       }
-    },
-    [],
-  );
+    }
+  }, []);
 
   const handleDrop = useCallback(
     async (event: React.DragEvent) => {
@@ -563,8 +539,9 @@ function XyFlowCanvasInner() {
     [t],
   );
 
-  const { state: dragOverState, handlers: dragOverHandlers } =
-    useCanvasDragOver({ onDrop: handleDrop });
+  const { state: dragOverState, handlers: dragOverHandlers } = useCanvasDragOver({
+    onDrop: handleDrop,
+  });
 
   const handleAddProject = useCallback(async () => {
     await promptAndAddProjectToScene(t);
@@ -613,6 +590,12 @@ function XyFlowCanvasInner() {
         const xtermHost = target.closest(".cf-xterm-host");
         const tile = xtermHost?.closest("[data-handoff-terminal-id]");
         if (tile?.getAttribute("data-focused") === "true") {
+          return;
+        }
+        // A selected browser owns wheel input; passive browser cards behave
+        // like every other canvas object so panning can begin over them.
+        const browserContent = target.closest("[data-browser-content]");
+        if (browserContent?.getAttribute("data-browser-interactive") === "true") {
           return;
         }
       }
@@ -688,151 +671,180 @@ function XyFlowCanvasInner() {
   }, [isPanMode, isPanning]);
 
   return (
-    <div
-      ref={canvasContainerRef}
-      className={`fixed bottom-0 overflow-hidden canvas-bg ${cursorClass} ${arranging ? "cf-arranging" : ""}`}
-      data-activity-heatmap={activityHeatmapEnabled ? "true" : undefined}
-      style={{
-        // Inset the opaque canvas to the centre: below the toolbar, between the
-        // rails. The surrounding margins stay transparent so the glass frame
-        // shows the desktop, never the canvas.
-        top: TOOLBAR_HEIGHT,
-        left: leftOffset,
-        right: rightOffset,
-        transition: sidebarDragging
-          ? undefined
-          : `left ${PANEL_TRANSITION_DURATION_MS}ms ${PANEL_TRANSITION_EASING_CSS}, ` +
-            `right ${PANEL_TRANSITION_DURATION_MS}ms ${PANEL_TRANSITION_EASING_CSS}`,
-      }}
-      onMouseDownCapture={handleContainerMouseDown}
-      onWheelCapture={handleWheelCapture}
-      onDragEnter={dragOverHandlers.onDragEnter}
-      onDragOver={dragOverHandlers.onDragOver}
-      onDragLeave={dragOverHandlers.onDragLeave}
-      onDrop={dragOverHandlers.onDrop}
-    >
-      <TerminalRuntimeLayer
-        projects={projects}
-        viewport={viewport}
-        rightPanelCollapsed={rightPanelCollapsed}
-        rightPanelWidth={rightPanelWidth}
-        leftPanelCollapsed={leftPanelCollapsed}
-        leftPanelWidth={leftPanelWidth}
-        taskDrawerOpen={taskDrawerOpen}
-      />
-      <ReactFlow
-        className="cf-xyflow"
-        style={{
-          willChange: isAnimating ? "transform" : undefined,
-          filter:
-            animationBlur > 0 && isAnimating
-              ? `blur(${animationBlur}px)`
-              : "none",
-          transition: animationBlur > 0 ? "filter 0.15s ease" : "none",
-        }}
-        defaultViewport={toFlowViewport(viewport)}
-        nodes={nodes}
-        edges={EMPTY_EDGES}
-        nodeTypes={xyflowNodeTypes}
-        onInit={handleInit}
-        onNodesChange={onNodesChange}
-        onMove={handleMove}
-        onMoveEnd={handleMoveEnd}
-        onPaneClick={handlePaneClick}
-        onPaneContextMenu={handlePaneContextMenu}
-        onNodeClick={handleNodeClick}
-        onNodeDragStart={handleNodeDragStart}
-        onNodeDragStop={handleNodeDragStop}
-        nodesConnectable={false}
-        nodesDraggable={!isPanMode}
-        nodesFocusable={false}
-        edgesFocusable={false}
-        elementsSelectable={false}
-        selectNodesOnDrag={false}
-        // In Hand mode (or Space-held), left+middle both pan. In Move
-        // mode, only middle-button pans — the left button is reserved
-        // for marquee on empty canvas (handled by useBoxSelect) and
-        // node drag (handled by React Flow's nodesDraggable).
-        panOnDrag={isPanMode ? [0, 1] : [1]}
-        snapToGrid
-        snapGrid={SNAP_GRID}
-        zoomOnScroll={false}
-        zoomOnPinch={false}
-        minZoom={0.1}
-        maxZoom={2}
-        // Runtime park/live policy already downshifts offscreen terminals to
-        // preview mode. Letting React Flow also cull offscreen nodes causes
-        // TerminalTile remount churn during viewport animation and focus
-        // cycling, which in turn destabilizes xterm/WebGL lifecycle.
-        preventScrolling
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background gap={20} size={2} color="var(--border)" />
-      </ReactFlow>
-
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.clientX}
-          y={contextMenu.clientY}
-          items={[
-            {
-              label: t.canvas_empty_action,
-              onClick: () => {
-                void handleAddProject();
-              },
-            },
-            { type: "separator" },
-            {
-              label: "New Shell",
-              onClick: () => handleContextMenuPick("shell"),
-            },
-            {
-              label: "New Claude",
-              onClick: () => handleContextMenuPick("claude"),
-            },
-            {
-              label: "New Codex",
-              onClick: () => handleContextMenuPick("codex"),
-            },
-            {
-              label: "New Gemini",
-              onClick: () => handleContextMenuPick("gemini"),
-            },
-            {
-              label: "New Lazygit",
-              onClick: () => handleContextMenuPick("lazygit"),
-            },
-          ]}
-          onClose={() => setContextMenu(null)}
+    <>
+      {/* Full-window wallpaper, behind ALL chrome. The frosted glass frame
+          (toolbar + rails) blurs THIS via backdrop-filter, and the inset canvas
+          below shows it directly under the scrim. */}
+      <div aria-hidden="true" className="cf-app-wallpaper">
+        <video
+          autoPlay
+          className="cf-canvas-live-wallpaper"
+          loop
+          muted
+          playsInline
+          poster={CANVAS_WALLPAPER_POSTER_URL}
+          preload="metadata"
+          src={CANVAS_LIVE_WALLPAPER_URL}
         />
-      )}
+      </div>
+      <div
+        ref={canvasContainerRef}
+        className={`fixed bottom-0 overflow-hidden canvas-bg ${cursorClass} ${arranging ? "cf-arranging" : ""}`}
+        data-activity-heatmap={activityHeatmapEnabled ? "true" : undefined}
+        style={{
+          // Inset the canvas to the centre: below the toolbar, between the
+          // rails. It's transparent so the full-window wallpaper shows through
+          // here as the canvas; the surrounding margins are the glass frame.
+          top: TOOLBAR_HEIGHT,
+          left: leftOffset,
+          right: rightOffset,
+          transition: sidebarDragging
+            ? undefined
+            : `left ${PANEL_TRANSITION_DURATION_MS}ms ${PANEL_TRANSITION_EASING_CSS}, ` +
+              `right ${PANEL_TRANSITION_DURATION_MS}ms ${PANEL_TRANSITION_EASING_CSS}`,
+        }}
+        onMouseDownCapture={handleContainerMouseDown}
+        onWheelCapture={handleWheelCapture}
+        onDragEnter={dragOverHandlers.onDragEnter}
+        onDragOver={dragOverHandlers.onDragOver}
+        onDragLeave={dragOverHandlers.onDragLeave}
+        onDrop={dragOverHandlers.onDrop}
+      >
+        <div aria-hidden="true" className="cf-canvas-wallpaper-scrim" />
+        <TerminalRuntimeLayer
+          projects={projects}
+          viewport={viewport}
+          rightPanelCollapsed={rightPanelCollapsed}
+          rightPanelWidth={rightPanelWidth}
+          leftPanelCollapsed={leftPanelCollapsed}
+          leftPanelWidth={leftPanelWidth}
+          taskDrawerOpen={taskDrawerOpen}
+        />
+        <ReactFlow
+          className="cf-xyflow"
+          style={{
+            willChange: isAnimating ? "transform" : undefined,
+            filter: animationBlur > 0 && isAnimating ? `blur(${animationBlur}px)` : "none",
+            transition: animationBlur > 0 ? "filter 0.15s ease" : "none",
+          }}
+          defaultViewport={toFlowViewport(viewport)}
+          nodes={nodes}
+          edges={EMPTY_EDGES}
+          nodeTypes={xyflowNodeTypes}
+          onInit={handleInit}
+          onNodesChange={onNodesChange}
+          onMove={handleMove}
+          onMoveEnd={handleMoveEnd}
+          onPaneClick={handlePaneClick}
+          onPaneContextMenu={handlePaneContextMenu}
+          onNodeClick={handleNodeClick}
+          onNodeDragStart={handleNodeDragStart}
+          onNodeDragStop={handleNodeDragStop}
+          nodesConnectable={false}
+          nodesDraggable={!isPanMode}
+          nodesFocusable={false}
+          edgesFocusable={false}
+          elementsSelectable={false}
+          selectNodesOnDrag={false}
+          // In Hand mode (or Space-held), left+middle both pan. In Move
+          // mode, only middle-button pans — the left button is reserved
+          // for marquee on empty canvas (handled by useBoxSelect) and
+          // node drag (handled by React Flow's nodesDraggable).
+          panOnDrag={isPanMode ? [0, 1] : [1]}
+          snapToGrid
+          snapGrid={SNAP_GRID}
+          zoomOnScroll={false}
+          zoomOnPinch={false}
+          minZoom={0.1}
+          maxZoom={2}
+          // Runtime park/live policy already downshifts offscreen terminals to
+          // preview mode. Letting React Flow also cull offscreen nodes causes
+          // TerminalTile remount churn during viewport animation and focus
+          // cycling, which in turn destabilizes xterm/WebGL lifecycle.
+          preventScrolling
+          proOptions={{ hideAttribution: true }}
+        ></ReactFlow>
 
-      <ClusterLinkLayer />
+        {contextMenu &&
+          createPortal(
+            // Portal to body so the menu lives in the ROOT stacking context, on
+            // top of everything — not trapped inside .canvas-bg (z-1), where the
+            // full-window wallpaper layer could paint over it.
+            <ContextMenu
+              x={contextMenu.clientX}
+              y={contextMenu.clientY}
+              items={[
+                {
+                  label: "Add Agent",
+                  submenu: [
+                    {
+                      label: "Claude",
+                      onClick: () => handleContextMenuPick("claude"),
+                    },
+                    {
+                      label: "Codex",
+                      onClick: () => handleContextMenuPick("codex"),
+                    },
+                    {
+                      label: "Gemini",
+                      onClick: () => handleContextMenuPick("gemini"),
+                    },
+                    {
+                      label: "Kimi",
+                      onClick: () => handleContextMenuPick("kimi"),
+                    },
+                    {
+                      label: "OpenCode",
+                      onClick: () => handleContextMenuPick("opencode"),
+                    },
+                  ],
+                },
+                {
+                  label: "Add Terminal",
+                  onClick: () => handleContextMenuPick("shell"),
+                },
+                { type: "separator" },
+                {
+                  label: t.canvas_empty_action,
+                  onClick: () => {
+                    void handleAddProject();
+                  },
+                },
+                {
+                  label: "New Lazygit",
+                  onClick: () => handleContextMenuPick("lazygit"),
+                },
+                { type: "separator" },
+                {
+                  label: "Settings",
+                  onClick: () => useSettingsModalStore.getState().openSettings(),
+                },
+              ]}
+              onClose={() => setContextMenu(null)}
+            />,
+            document.body,
+          )}
 
-      <BoxSelectOverlay />
-      <CanvasCardLayer />
-      {drawingEnabled && <DrawingLayer />}
-      {petEnabled && <PetOverlay />}
+        <ClusterLinkLayer />
 
-      <WorktreeLabelLayer />
+        <BoxSelectOverlay />
+        {drawingEnabled && <DrawingLayer />}
+        {petEnabled && <PetOverlay />}
 
-      <SpatialWaypointsLayer />
+        <WorktreeLabelLayer />
 
-      <FamilyTreeOverlay />
+        <SpatialWaypointsLayer />
 
-      <CanvasDragoverCue
-        active={dragOverState.isDragOver}
-        showChip={
-          dragOverState.isDragOver &&
-          dragOverState.isFolderDrop &&
-          projects.length > 0
-        }
-      />
+        <FamilyTreeOverlay />
 
-      {projects.length === 0 && (
-        <CanvasEmptyState isDragOver={dragOverState.isDragOver} />
-      )}
-    </div>
+        <CanvasDragoverCue
+          active={dragOverState.isDragOver}
+          showChip={dragOverState.isDragOver && dragOverState.isFolderDrop && projects.length > 0}
+        />
+
+        {projects.length === 0 && <CanvasEmptyState isDragOver={dragOverState.isDragOver} />}
+      </div>
+    </>
   );
 }
 

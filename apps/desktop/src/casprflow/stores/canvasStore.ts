@@ -14,7 +14,7 @@ export type FocusLevel = "terminal" | "starred" | "worktree";
  * the FileEditor drawer (Monaco) that slides over the canvas,
  * driven by `fileEditorPath` below.
  */
-export type RightPanelTab = "files" | "diff" | "git" | "memory";
+export type RightPanelTab = "files" | "diff" | "git" | "memory" | "browser";
 export type LeftPanelTab = "sessions" | "history";
 export interface CanvasViewportAdapter {
   setViewport: (viewport: Viewport, options?: { duration?: number }) => void;

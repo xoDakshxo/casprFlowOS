@@ -1,6 +1,7 @@
-﻿import { useEffect, useRef, useCallback, useState } from "react";
+﻿import type { CSSProperties } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
-import { Search } from "lucide-react";
+import { Search, Star } from "lucide-react";
 import type { TerminalData } from "../types";
 import { activateTerminalInScene } from "../actions/sceneSelectionActions";
 import {
@@ -10,11 +11,7 @@ import {
   toggleTerminalStarredInScene,
   updateTerminalCustomTitleInScene,
 } from "../actions/terminalSceneActions";
-import {
-  useProjectStore,
-  findTerminalById,
-  getChildTerminals,
-} from "../stores/projectStore";
+import { useProjectStore, findTerminalById, getChildTerminals } from "../stores/projectStore";
 import { ContextMenu } from "../components/ContextMenu";
 import { TagManager } from "./TagManager";
 import { usePreferencesStore } from "../stores/preferencesStore";
@@ -40,10 +37,7 @@ import {
 } from "./terminalRuntimeStore";
 import type { TerminalMountMode } from "./terminalRuntimePolicy";
 import { shellEscapePath } from "../utils/shellEscape";
-import {
-  cancelScheduledTerminalFocus,
-  scheduleTerminalFocus,
-} from "./focusScheduler";
+import { cancelScheduledTerminalFocus, scheduleTerminalFocus } from "./focusScheduler";
 import { useSidebarDragStore } from "../stores/sidebarDragStore";
 import { usePinDragStore } from "../stores/pinDragStore";
 import { usePinStore } from "../stores/pinStore";
@@ -72,8 +66,6 @@ interface Props {
   width: number;
   height: number;
 }
-
-const TYPE_CONFIG = TERMINAL_TYPE_CONFIG;
 
 function HierarchyBadges({ terminal }: { terminal: TerminalData }) {
   const projects = useProjectStore((s) => s.projects);
@@ -152,10 +144,7 @@ function PreviewPane({
         : "Live terminal parked offscreen. The real xterm resumes when this tile becomes visible again.";
 
   return (
-    <div
-      className="flex-1 min-h-0 overflow-hidden px-1 pb-1"
-      style={{ pointerEvents: "none" }}
-    >
+    <div className="flex-1 min-h-0 overflow-hidden px-1 pb-1" style={{ pointerEvents: "none" }}>
       <div className="flex h-full min-h-0 flex-col rounded-sm border border-[var(--border)] bg-[color-mix(in_srgb,var(--surface)_78%,transparent)] px-3 py-2">
         <div className="mb-2 flex items-center justify-between gap-2 text-[10px] text-[var(--text-faint)]">
           <span
@@ -165,9 +154,7 @@ function PreviewPane({
             {label}
           </span>
           <span style={{ fontFamily: '"Geist Mono", monospace' }}>
-            {lodMode === "evicted"
-              ? "preview fallback"
-              : "live xterm preserved"}
+            {lodMode === "evicted" ? "preview fallback" : "live xterm preserved"}
           </span>
         </div>
         <pre
@@ -201,9 +188,7 @@ export function TerminalTile({
   } | null>(null);
   const [showCopiedToast, setShowCopiedToast] = useState(false);
   const [isEditingCustomTitle, setIsEditingCustomTitle] = useState(false);
-  const [customTitleDraft, setCustomTitleDraft] = useState(
-    terminal.customTitle ?? "",
-  );
+  const [customTitleDraft, setCustomTitleDraft] = useState(terminal.customTitle ?? "");
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tileRef = useRef<HTMLDivElement>(null);
   const settledFitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -213,13 +198,9 @@ export function TerminalTile({
   }, []);
   const pendingFocusFrameRef = useRef<number | null>(null);
   const customTitleInputRef = useRef<HTMLInputElement>(null);
-  const copiedNonce = useTerminalRuntimeStore(
-    (s) => s.terminals[terminal.id]?.copiedNonce ?? 0,
-  );
+  const copiedNonce = useTerminalRuntimeStore((s) => s.terminals[terminal.id]?.copiedNonce ?? 0);
   const mountNonceRef = useRef(copiedNonce);
-  const previewText = useTerminalRuntimeStore(
-    (s) => s.terminals[terminal.id]?.previewText ?? "",
-  );
+  const previewText = useTerminalRuntimeStore((s) => s.terminals[terminal.id]?.previewText ?? "");
   const [dragOver, setDragOver] = useState(false);
   const agentBodyRef = useRef<HTMLDivElement>(null);
   const [agentBodySize, setAgentBodySize] = useState<{
@@ -238,28 +219,22 @@ export function TerminalTile({
   const taskDragActive = usePinDragStore((s) => s.active);
   const handoffActive = useHandoffDragStore((s) => s.active);
   const handoffSourceId = useHandoffDragStore((s) => s.payload?.sourceTerminalId ?? null);
-  const handoffHoveredTerminalId = useHandoffDragStore(
-    (s) => s.hoveredTerminalId,
-  );
+  const handoffHoveredTerminalId = useHandoffDragStore((s) => s.hoveredTerminalId);
   const isHandoffSource = handoffActive && handoffSourceId === terminal.id;
-  const isHandoffTarget =
-    handoffActive && handoffHoveredTerminalId === terminal.id;
-  const terminalTaskAssignment = usePinStore(
-    (s) => s.terminalPinMap[terminal.id],
-  );
+  const isHandoffTarget = handoffActive && handoffHoveredTerminalId === terminal.id;
+  const terminalTaskAssignment = usePinStore((s) => s.terminalPinMap[terminal.id]);
   const [taskFlash, setTaskFlash] = useState(false);
   const taskFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const composerAdapter = getComposerAdapter(terminal.type);
   const acceptsTaskDrop = composerAdapter !== null;
   const viewportScale = useCanvasStore((s) => s.viewport.scale);
-  const zoomedOutTerminalId = useViewportFocusStore(
-    (s) => s.zoomedOutTerminalId,
-  );
+  // Grow the header as the canvas zooms out (clamped) so the window's title
+  // stays legible — net on-screen size stays roughly constant. Matches browser.
+  const headerZoom = Math.min(3.2, Math.max(1, 1 / viewportScale));
+  const zoomedOutTerminalId = useViewportFocusStore((s) => s.zoomedOutTerminalId);
   const fitAllScale = useViewportFocusStore((s) => s.fitAllScale);
   const isOverviewMode =
-    fitAllScale !== null &&
-    zoomedOutTerminalId !== null &&
-    viewportScale <= fitAllScale * 1.2;
+    fitAllScale !== null && zoomedOutTerminalId !== null && viewportScale <= fitAllScale * 1.2;
   const liveRuntimeState = useResolvedTerminalRuntimeState(terminal);
   const liveTerminal = {
     ...terminal,
@@ -273,14 +248,16 @@ export function TerminalTile({
   } | null>(null);
 
   const t = useT();
-  const config = TYPE_CONFIG[terminal.type] ?? {
-    color: "#888",
+  const headerContextLabel = getTerminalHeaderContextLabel(worktreeName, terminal.title);
+  const displayTitle = terminal.customTitle || suggestedCallsign(terminal.id);
+  const terminalConfig = TERMINAL_TYPE_CONFIG[terminal.type] ?? {
+    color: "var(--text-primary)",
     label: terminal.type,
   };
-  const headerContextLabel = getTerminalHeaderContextLabel(
-    worktreeName,
-    terminal.title,
-  );
+  const terminalTitleStyle = {
+    "--terminal-agent-color": terminalConfig.color,
+    fontFamily: '"Geist Mono", monospace',
+  } as CSSProperties;
   useEffect(() => {
     if (!isEditingCustomTitle) {
       setCustomTitleDraft(terminal.customTitle ?? "");
@@ -297,12 +274,7 @@ export function TerminalTile({
   }, []);
 
   const saveCustomTitleEdit = useCallback(() => {
-    updateTerminalCustomTitleInScene(
-      projectId,
-      worktreeId,
-      terminal.id,
-      customTitleDraft,
-    );
+    updateTerminalCustomTitleInScene(projectId, worktreeId, terminal.id, customTitleDraft);
     setIsEditingCustomTitle(false);
   }, [customTitleDraft, projectId, terminal.id, worktreeId]);
 
@@ -496,14 +468,7 @@ export function TerminalTile({
         settledFitTimerRef.current = null;
       }
     };
-  }, [
-    containerEl,
-    isAgent,
-    lodMode,
-    terminal.id,
-    terminal.minimized,
-    useAgentRenderer,
-  ]);
+  }, [containerEl, isAgent, lodMode, terminal.id, terminal.minimized, useAgentRenderer]);
 
   useEffect(() => {
     if (!isAgent || !sidebarDragActive) {
@@ -513,8 +478,7 @@ export function TerminalTile({
     if (!containerEl) return;
 
     const bgColor =
-      getTerminalRuntime(terminal.id)?.xterm?.options.theme?.background ??
-      "#1e1e1e";
+      getTerminalRuntime(terminal.id)?.xterm?.options.theme?.background ?? "#1e1e1e";
 
     setFrozenDims({
       width: containerEl.offsetWidth,
@@ -524,9 +488,7 @@ export function TerminalTile({
   }, [isAgent, sidebarDragActive, terminal.id, containerEl]);
 
   const composerEnabled = usePreferencesStore((s) => s.composerEnabled);
-  const activityHeatmapEnabled = usePreferencesStore(
-    (s) => s.activityHeatmapEnabled,
-  );
+  const activityHeatmapEnabled = usePreferencesStore((s) => s.activityHeatmapEnabled);
   const terminalRenderer = usePreferencesStore((s) => s.terminalRenderer);
   const terminalEngine = usePreferencesStore((s) => s.terminalEngine);
   const focusLiveTerminal = useCallback(() => {
@@ -596,8 +558,7 @@ export function TerminalTile({
       }
     };
     window.addEventListener("casprflowos:focus-custom-title", handler);
-    return () =>
-      window.removeEventListener("casprflowos:focus-custom-title", handler);
+    return () => window.removeEventListener("casprflowos:focus-custom-title", handler);
   }, [startCustomTitleEdit, terminal.id]);
 
   useEffect(() => {
@@ -612,7 +573,8 @@ export function TerminalTile({
         e.type !== "mouseup" &&
         e.type !== "click" &&
         e.type !== "dblclick"
-      ) return;
+      )
+        return;
       e.stopPropagation();
       e.preventDefault();
       if (e.type === "click" && e.detail === 1) focusTerminalInOverview();
@@ -665,34 +627,25 @@ export function TerminalTile({
 
       const ptyId = getTerminalPtyId(terminal.id);
       if (ptyId === null) {
-        useNotificationStore
-          .getState()
-          .notify("warn", t["pin.dispatch.terminalNotRunning"]);
+        useNotificationStore.getState().notify("warn", t["pin.dispatch.terminalNotRunning"]);
         return;
       }
       if (!composerAdapter) {
         useNotificationStore
           .getState()
-          .notify(
-            "warn",
-            t["pin.dispatch.unsupportedTerminal"](terminal.type),
-          );
+          .notify("warn", t["pin.dispatch.unsupportedTerminal"](terminal.type));
         return;
       }
 
       activateTerminalInScene(projectId, worktreeId, terminal.id);
 
       try {
-        const result = await window.casprFlowOS.pins.dispatchToTerminal(
-          parsed.repo,
-          parsed.id,
-          {
-            terminalId: terminal.id,
-            ptyId,
-            terminalType: terminal.type,
-            worktreePath,
-          },
-        );
+        const result = await window.casprFlowOS.pins.dispatchToTerminal(parsed.repo, parsed.id, {
+          terminalId: terminal.id,
+          ptyId,
+          terminalType: terminal.type,
+          worktreePath,
+        });
         if (result.ok) {
           // Record the terminal ↔ pin association for the badge. Look the
           // full pin up so we cache its current title; if the project
@@ -716,16 +669,12 @@ export function TerminalTile({
             .getState()
             .notify(
               "error",
-              t["pin.dispatch.failed"](
-                result.detail ?? result.error ?? "unknown",
-              ),
+              t["pin.dispatch.failed"](result.detail ?? result.error ?? "unknown"),
             );
         }
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
-        useNotificationStore
-          .getState()
-          .notify("error", t["pin.dispatch.failed"](detail));
+        useNotificationStore.getState().notify("error", t["pin.dispatch.failed"](detail));
       }
     },
     [
@@ -748,9 +697,7 @@ export function TerminalTile({
 
     const isTaskDrag = (e: DragEvent) =>
       !!e.dataTransfer &&
-      Array.from(e.dataTransfer.types).includes(
-        "application/x-casprflowos-pin",
-      );
+      Array.from(e.dataTransfer.types).includes("application/x-casprflowos-pin");
 
     const onDragOver = (e: DragEvent) => {
       if (isTaskDrag(e) && !acceptsTaskDrop) return;
@@ -870,13 +817,7 @@ export function TerminalTile({
       window.casprFlowOS.terminal.input(ptyId, " " + escaped);
       activateTerminalInScene(projectId, worktreeId, terminal.id);
     },
-    [
-      acceptsTaskDrop,
-      handleTaskDropPayload,
-      projectId,
-      terminal.id,
-      worktreeId,
-    ],
+    [acceptsTaskDrop, handleTaskDropPayload, projectId, terminal.id, worktreeId],
   );
 
   return (
@@ -886,9 +827,7 @@ export function TerminalTile({
       data-drag-over={dragOver ? "true" : undefined}
       data-task-flash={taskFlash ? "true" : undefined}
       data-receptive={
-        taskDragActive && acceptsTaskDrop && !dragOver && !taskFlash
-          ? "true"
-          : undefined
+        taskDragActive && acceptsTaskDrop && !dragOver && !taskFlash ? "true" : undefined
       }
       data-overview={isOverviewMode ? "true" : undefined}
       data-handoff-terminal-id={terminal.id}
@@ -897,10 +836,11 @@ export function TerminalTile({
       onDragOver={handleTileDragOver}
       onDragLeave={handleTileDragLeave}
       onDrop={handleTileDrop}
-      className="terminal-tile rounded-md border border-[var(--border)] bg-[var(--surface)] overflow-hidden flex flex-col h-full w-full"
+      className="terminal-tile border border-[var(--border)] bg-[var(--terminal-bg)] overflow-hidden flex flex-col h-full w-full"
       style={{
         width: width,
         height: terminal.minimized ? "auto" : height,
+        borderRadius: "var(--radius-tile)",
         outline: "none",
       }}
       onClick={(e) => {
@@ -924,17 +864,13 @@ export function TerminalTile({
         );
       }}
       onMouseLeave={() => {
-        window.dispatchEvent(
-          new CustomEvent("casprflowos:terminal-hover", { detail: null }),
-        );
+        window.dispatchEvent(new CustomEvent("casprflowos:terminal-hover", { detail: null }));
       }}
       onWheel={(e) => e.stopPropagation()}
     >
       <div
-        className="cf-tile-header relative flex items-center gap-2 px-3 py-2 select-none shrink-0"
-        style={{
-          backgroundImage: `linear-gradient(90deg, color-mix(in srgb, ${config.color} 16%, transparent), transparent 280px)`,
-        }}
+        className="cf-tile-header relative grid grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)] items-center gap-2 px-3 py-2 select-none shrink-0"
+        style={{ zoom: headerZoom }}
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -949,50 +885,34 @@ export function TerminalTile({
           panToTerminal(terminal.id);
         }}
       >
-        {/* Agent identity: brand icon + highlighted name, so the agent is
-            instantly recognisable. */}
-        <div
-          className="shrink-0 flex items-center gap-1.5 rounded-md py-0.5 pl-0.5 pr-2"
-          style={{
-            backgroundColor: `color-mix(in srgb, ${config.color} 14%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${config.color} 30%, transparent)`,
-          }}
-        >
-          <span className="shrink-0" style={{ width: 17, height: 17 }}>
-            <AgentGlyph type={terminal.type} />
+        <div className="min-w-0 flex items-center gap-2">
+          <span className="cf-agent-logo-chip shrink-0" aria-hidden="true">
+            <span className="block" style={{ width: 17, height: 17 }}>
+              <AgentGlyph type={terminal.type} />
+            </span>
           </span>
+          <HierarchyBadges terminal={terminal} />
           <span
-            className="text-[11.5px] font-semibold leading-none"
-            style={{ color: config.color, fontFamily: '"Geist Mono", monospace' }}
+            className="min-w-0 truncate whitespace-nowrap text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded px-1 py-0.5 transition-colors duration-quick cursor-pointer"
+            style={{ fontFamily: '"Geist Mono", monospace' }}
+            title={headerContextLabel}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              focusWorktreeInScene(projectId, worktreeId);
+              panToWorktree(projectId, worktreeId, { enterOverview: true });
+              const canvas = useCanvasStore.getState();
+              canvas.setRightPanelCollapsed(false);
+              canvas.setRightPanelActiveTab("files");
+            }}
           >
-            {config.label}
+            {headerContextLabel}
           </span>
         </div>
-        <HierarchyBadges terminal={terminal} />
-        <span
-          className="shrink-0 whitespace-nowrap text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--border)] rounded px-1 py-0.5 transition-colors duration-quick cursor-pointer"
-          style={{ fontFamily: '"Geist Mono", monospace' }}
-          title={headerContextLabel}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            focusWorktreeInScene(projectId, worktreeId);
-            panToWorktree(projectId, worktreeId, { enterOverview: true });
-            const canvas = useCanvasStore.getState();
-            canvas.setRightPanelCollapsed(false);
-            canvas.setRightPanelActiveTab("files");
-          }}
-        >
-          {headerContextLabel}
-        </span>
         <div
-          className={`cf-tile-title-editable nodrag h-6 min-w-0 flex-1 rounded-md border px-1.5 text-[11px] ${
-            terminal.customTitle
-              ? "border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)]"
-              : "border-dashed border-[var(--border)] bg-[var(--bg)] text-[var(--text-faint)]"
-          }`}
-          style={{ fontFamily: '"Geist Mono", monospace' }}
-          title={terminal.customTitle || t.terminal_custom_title_placeholder}
+          className="cf-tile-title-editable nodrag min-w-0 w-full justify-self-center text-[11px] text-[var(--text-primary)]"
+          style={terminalTitleStyle}
+          title={displayTitle}
           onMouseDown={(e) => e.stopPropagation()}
           onDoubleClick={(e) => {
             e.stopPropagation();
@@ -1003,115 +923,81 @@ export function TerminalTile({
             startCustomTitleEdit();
           }}
         >
-          <div className="flex h-full items-center gap-1.5 min-w-0">
+          {isEditingCustomTitle ? (
+            <input
+              ref={customTitleInputRef}
+              className="cf-tile-title-input min-w-0 bg-transparent outline-none leading-[22px] text-center"
+              value={customTitleDraft}
+              placeholder={suggestedCallsign(terminal.id)}
+              onChange={(e) => setCustomTitleDraft(e.target.value)}
+              onBlur={saveCustomTitleEdit}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  saveCustomTitleEdit();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  stopCustomTitleEdit();
+                }
+              }}
+            />
+          ) : isSummarizing ? (
+            <span className="block min-w-0 truncate leading-[22px] text-center animate-pulse text-[var(--text-faint)]">
+              {t.summary_in_progress}
+            </span>
+          ) : (
             <button
-              className={`cf-tile-action shrink-0 rounded p-0.5 ${
-                terminal.starred
-                  ? "text-[var(--amber)] hover:brightness-110"
-                  : "text-[var(--text-faint)] hover:text-[var(--amber)]"
-              }`}
-              data-pinned={terminal.starred ? "true" : undefined}
-              title={terminal.starred ? t.terminal_unstar : t.terminal_star}
+              type="button"
+              className="cf-tile-title-display min-w-0 truncate text-center leading-[22px]"
+              title={displayTitle}
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                toggleTerminalStarredInScene(
-                  projectId,
-                  worktreeId,
-                  terminal.id,
-                );
+                if (isOverviewMode) {
+                  zoomIntoTerminalFromOverview();
+                }
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                if (isOverviewMode) {
+                  zoomIntoTerminalFromOverview();
+                  return;
+                }
+                startCustomTitleEdit();
               }}
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 10 10"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M5 1.2l1.05 2.13 2.35.34-1.7 1.66.4 2.35L5 6.58 2.9 7.68l.4-2.35L1.6 3.67l2.35-.34L5 1.2z"
-                  fill={terminal.starred ? "currentColor" : "none"}
-                  stroke="currentColor"
-                  strokeWidth="1"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {displayTitle}
             </button>
-            {isEditingCustomTitle ? (
-              <input
-                ref={customTitleInputRef}
-                className="min-w-0 flex-1 bg-transparent outline-none leading-[22px] text-[var(--text-primary)]"
-                value={customTitleDraft}
-                placeholder={suggestedCallsign(terminal.id)}
-                onChange={(e) => setCustomTitleDraft(e.target.value)}
-                onBlur={saveCustomTitleEdit}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    saveCustomTitleEdit();
-                  } else if (e.key === "Escape") {
-                    e.preventDefault();
-                    stopCustomTitleEdit();
-                  }
-                }}
-              />
-            ) : isSummarizing ? (
-              <span className="min-w-0 flex-1 truncate leading-[22px] animate-pulse text-[var(--text-faint)]">
-                {t.summary_in_progress}
-              </span>
-            ) : (
-              <>
-                <span
-                  className={`min-w-0 flex-1 truncate leading-[22px] ${
-                    terminal.customTitle ? "" : "text-[var(--text-faint)]"
-                  }`}
-                >
-                  {terminal.customTitle || suggestedCallsign(terminal.id)}
-                </span>
-                <button
-                  type="button"
-                  className="cf-tile-action shrink-0 rounded p-0.5 text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--border)]"
-                  title={t.terminal_custom_title_placeholder}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isOverviewMode) {
-                      zoomIntoTerminalFromOverview();
-                      return;
-                    }
-                    startCustomTitleEdit();
-                  }}
-                >
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 10 10"
-                    fill="none"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M1.6 8.4 L7.2 2.8 L8.5 4.1 L2.9 9.7 Z"
-                      stroke="currentColor"
-                      strokeWidth="1"
-                      strokeLinejoin="round"
-                      transform="translate(-0.3 -1.2)"
-                    />
-                  </svg>
-                </button>
-              </>
-            )}
-          </div>
+          )}
         </div>
-        {activityHeatmapEnabled && (
-          <ActivitySparkline terminalId={terminal.id} />
-        )}
-        <div className="flex items-center gap-0.5">
+        <div className="cf-tile-shell-actions min-w-0 flex items-center justify-end">
+          {activityHeatmapEnabled && <ActivitySparkline terminalId={terminal.id} />}
+          <button
+            className={`cf-tile-star-action shrink-0 rounded ${
+              terminal.starred
+                ? "text-[var(--terminal-action-minimize)] hover:brightness-110"
+                : ""
+            }`}
+            data-pinned={terminal.starred ? "true" : undefined}
+            title={terminal.starred ? t.terminal_unstar : t.terminal_star}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleTerminalStarredInScene(projectId, worktreeId, terminal.id);
+            }}
+          >
+            <Star
+              size={13}
+              strokeWidth={2.25}
+              fill={terminal.starred ? "currentColor" : "none"}
+              aria-hidden="true"
+            />
+          </button>
           {!useAgentRenderer && lodMode === "live" && !terminal.minimized && (
             <button
               type="button"
-              className="cf-tile-action p-1 rounded-md text-[color-mix(in_srgb,var(--accent)_78%,transparent)] hover:text-[var(--accent)] hover:bg-[color-mix(in_srgb,var(--accent)_16%,transparent)]"
+              className="cf-tile-shell-action cf-tile-shell-action-search"
               title={t.shortcut_open_terminal_find}
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -1119,12 +1005,16 @@ export function TerminalTile({
                 handleOpenFind();
               }}
             >
-              <Search size={11} strokeWidth={1.9} aria-hidden="true" />
+              <Search
+                className="cf-tile-shell-action-icon"
+                size={11}
+                strokeWidth={3.35}
+                aria-hidden="true"
+              />
             </button>
           )}
           <button
-            className="cf-tile-action text-[var(--amber)] bg-[color-mix(in_srgb,var(--amber)_13%,transparent)] hover:bg-[color-mix(in_srgb,var(--amber)_26%,transparent)] p-1 rounded-md"
-            data-visible="always"
+            className="cf-tile-shell-action cf-tile-shell-action-minimize"
             data-pinned={terminal.minimized ? "true" : undefined}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -1132,7 +1022,13 @@ export function TerminalTile({
               toggleTerminalMinimizeInScene(projectId, worktreeId, terminal.id);
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <svg
+              className="cf-tile-shell-action-icon"
+              width="11"
+              height="11"
+              viewBox="0 0 10 10"
+              fill="none"
+            >
               {terminal.minimized ? (
                 <rect
                   x="2"
@@ -1140,33 +1036,33 @@ export function TerminalTile({
                   width="6"
                   height="6"
                   stroke="currentColor"
-                  strokeWidth="1.2"
+                  strokeWidth="1.85"
                   rx="0.5"
                 />
               ) : (
-                <path
-                  d="M2 5H8"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                />
+                <path d="M2 5H8" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" />
               )}
             </svg>
           </button>
           <button
-            className="cf-tile-action text-[var(--red)] bg-[color-mix(in_srgb,var(--red)_13%,transparent)] hover:bg-[color-mix(in_srgb,var(--red)_26%,transparent)] p-1 rounded-md"
-            data-visible="always"
+            className="cf-tile-shell-action cf-tile-shell-action-close"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               handleClose();
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <svg
+              className="cf-tile-shell-action-icon"
+              width="11"
+              height="11"
+              viewBox="0 0 10 10"
+              fill="none"
+            >
               <path
                 d="M2.5 2.5L7.5 7.5M7.5 2.5L2.5 7.5"
                 stroke="currentColor"
-                strokeWidth="1.7"
+                strokeWidth="2.25"
                 strokeLinecap="round"
               />
             </svg>
@@ -1179,9 +1075,7 @@ export function TerminalTile({
           <button
             type="button"
             className="group/badge inline-flex items-center gap-1 max-w-[200px] px-1.5 py-0.5 rounded-sm text-[10px] leading-none cursor-pointer bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/25 hover:border-[var(--accent)]/45 transition-colors duration-quick"
-            title={t["pin.terminalBadge.tooltip"](
-              terminalTaskAssignment.title,
-            )}
+            title={t["pin.terminalBadge.tooltip"](terminalTaskAssignment.title)}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
@@ -1240,59 +1134,53 @@ export function TerminalTile({
             <WtermTile terminal={liveTerminal} />
           </div>
         ) : (
-        <div
-          className={
-            terminal.minimized
-              ? "relative nopan nodrag nowheel"
-              : "flex-1 min-h-0 relative nopan nodrag nowheel"
-          }
-          style={{
-            height: terminal.minimized ? 0 : undefined,
-            overflow: "hidden",
-            backgroundColor: frozenDims?.bgColor,
-          }}
-        >
           <div
-            ref={containerRef}
             className={
-              frozenDims
-                ? "absolute cf-xterm-host nopan nodrag nowheel"
-                : "absolute inset-0 cf-xterm-host nopan nodrag nowheel"
+              terminal.minimized
+                ? "relative nopan nodrag nowheel"
+                : "flex-1 min-h-0 relative nopan nodrag nowheel"
             }
             style={{
-              padding: 0,
+              height: terminal.minimized ? 0 : undefined,
               overflow: "hidden",
-              ...(frozenDims
-                ? {
-                    top: 0,
-                    left: 0,
-                    width: frozenDims.width,
-                    height: frozenDims.height,
-                  }
-                : undefined),
+              backgroundColor: frozenDims?.bgColor,
             }}
-            onClick={(e) => {
-              if (isOverviewMode) {
-                e.stopPropagation();
-                focusTerminalInOverview();
-                return;
+          >
+            <div
+              ref={containerRef}
+              className={
+                frozenDims
+                  ? "absolute cf-xterm-host nopan nodrag nowheel"
+                  : "absolute inset-0 cf-xterm-host nopan nodrag nowheel"
               }
-              const adapter = getComposerAdapter(terminal.type);
-              if (
-                !adapter ||
-                adapter.inputMode === "type" ||
-                !composerEnabled
-              ) {
-                scheduleXtermFocus();
-              } else {
-                window.dispatchEvent(
-                  new CustomEvent("casprflowos:focus-composer"),
-                );
-              }
-            }}
-          />
-          <TerminalFindOverlay terminalId={terminal.id} />
-        </div>
+              style={{
+                padding: 0,
+                overflow: "hidden",
+                ...(frozenDims
+                  ? {
+                      top: 0,
+                      left: 0,
+                      width: frozenDims.width,
+                      height: frozenDims.height,
+                    }
+                  : undefined),
+              }}
+              onClick={(e) => {
+                if (isOverviewMode) {
+                  e.stopPropagation();
+                  focusTerminalInOverview();
+                  return;
+                }
+                const adapter = getComposerAdapter(terminal.type);
+                if (!adapter || adapter.inputMode === "type" || !composerEnabled) {
+                  scheduleXtermFocus();
+                } else {
+                  window.dispatchEvent(new CustomEvent("casprflowos:focus-composer"));
+                }
+              }}
+            />
+            <TerminalFindOverlay terminalId={terminal.id} />
+          </div>
         )
       ) : (
         <div
@@ -1302,9 +1190,7 @@ export function TerminalTile({
             overflow: "hidden",
           }}
         >
-          {!terminal.minimized && (
-            <PreviewPane lodMode={lodMode} previewText={previewText} />
-          )}
+          {!terminal.minimized && <PreviewPane lodMode={lodMode} previewText={previewText} />}
         </div>
       )}
 
@@ -1322,13 +1208,11 @@ export function TerminalTile({
             items={[
               {
                 label: t.stash_terminal,
-                onClick: () =>
-                  stashTerminalInScene(projectId, worktreeId, terminal.id),
+                onClick: () => stashTerminalInScene(projectId, worktreeId, terminal.id),
               },
               {
                 label: "Tags…",
-                onClick: () =>
-                  setTagManager({ x: contextMenu.x, y: contextMenu.y }),
+                onClick: () => setTagManager({ x: contextMenu.x, y: contextMenu.y }),
               },
               ...(terminalRenderer === "webgl"
                 ? [
@@ -1336,10 +1220,7 @@ export function TerminalTile({
                     {
                       label: t["palette.cmd.refresh_terminal_rendering"],
                       onClick: () => {
-                        resetWebGL(
-                          terminal.id,
-                          "terminal_context_menu_refresh_rendering",
-                        );
+                        resetWebGL(terminal.id, "terminal_context_menu_refresh_rendering");
                         refreshRegisteredTerminalViewports(terminal.id);
                       },
                     },
