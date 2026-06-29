@@ -394,6 +394,16 @@ const casprFlowOSBridge = Object.freeze({
     platform,
     requestClose: () => window.close(),
     setQuitOnLastWindowClosed: () => undefined,
+    onToolbarMetrics: (listener: (metrics: { left: number }) => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        metrics: { left: number },
+      ): void => {
+        listener(metrics);
+      };
+      ipcRenderer.on("window:toolbar-metrics", handler);
+      return () => ipcRenderer.off("window:toolbar-metrics", handler);
+    },
   },
   hooks: {
     getSocketPath: () => Promise.resolve(null),

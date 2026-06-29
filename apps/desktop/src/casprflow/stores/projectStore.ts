@@ -9,19 +9,13 @@ import type {
   SpatialWaypoint,
   SpatialWaypointSlot,
 } from "../types/index.ts";
-import {
-  filterValidSelectedItems,
-  sameSelectedItems,
-} from "../canvas/sceneState.ts";
+import { filterValidSelectedItems, sameSelectedItems } from "../canvas/sceneState.ts";
 import {
   withToggledTerminalStarred,
   withUpdatedTerminalCustomTitle,
   withUpdatedTerminalType,
 } from "./terminalState.ts";
-import {
-  normalizeProjectsFocus,
-  findNextVisibleTerminalId,
-} from "./projectFocus.ts";
+import { normalizeProjectsFocus, findNextVisibleTerminalId } from "./projectFocus.ts";
 import { useWorkspaceStore } from "./workspaceStore.ts";
 import { usePreferencesStore } from "./preferencesStore.ts";
 import { logSlowRendererPath } from "../utils/devPerf.ts";
@@ -50,27 +44,15 @@ interface ProjectStore {
     worktrees: { path: string; branch: string; isPrimary: boolean }[],
   ) => void;
 
-  addTerminal: (
-    projectId: string,
-    worktreeId: string,
-    terminal: TerminalData,
-  ) => void;
-  removeTerminal: (
-    projectId: string,
-    worktreeId: string,
-    terminalId: string,
-  ) => void;
+  addTerminal: (projectId: string, worktreeId: string, terminal: TerminalData) => void;
+  removeTerminal: (projectId: string, worktreeId: string, terminalId: string) => void;
   updateTerminalPtyId: (
     projectId: string,
     worktreeId: string,
     terminalId: string,
     ptyId: number | null,
   ) => void;
-  toggleTerminalMinimize: (
-    projectId: string,
-    worktreeId: string,
-    terminalId: string,
-  ) => void;
+  toggleTerminalMinimize: (projectId: string, worktreeId: string, terminalId: string) => void;
   updateTerminalStatus: (
     projectId: string,
     worktreeId: string,
@@ -101,10 +83,12 @@ interface ProjectStore {
     terminalId: string,
     customTitle: string,
   ) => void;
-  toggleTerminalStarred: (
+  toggleTerminalStarred: (projectId: string, worktreeId: string, terminalId: string) => void;
+  updateTerminalUrl: (
     projectId: string,
     worktreeId: string,
     terminalId: string,
+    url: string,
   ) => void;
   updateTerminalPosition: (
     projectId: string,
@@ -129,6 +113,12 @@ interface ProjectStore {
     width: number,
     height: number,
   ) => void;
+  updateTerminalBounds: (
+    projectId: string,
+    worktreeId: string,
+    terminalId: string,
+    bounds: Pick<TerminalData, "x" | "y" | "width" | "height">,
+  ) => void;
   addTerminalTag: (
     projectId: string,
     worktreeId: string,
@@ -151,17 +141,10 @@ interface ProjectStore {
     terminalId: string | null,
     options?: { focusComposer?: boolean; focusInput?: boolean },
   ) => void;
-  setFocusedWorktree: (
-    projectId: string | null,
-    worktreeId: string | null,
-  ) => void;
+  setFocusedWorktree: (projectId: string | null, worktreeId: string | null) => void;
   clearFocus: () => void;
 
-  setWaypoint: (
-    projectId: string,
-    slot: SpatialWaypointSlot,
-    waypoint: SpatialWaypoint,
-  ) => void;
+  setWaypoint: (projectId: string, slot: SpatialWaypointSlot, waypoint: SpatialWaypoint) => void;
   clearWaypoint: (projectId: string, slot: SpatialWaypointSlot) => void;
 
   setProjects: (projects: ProjectData[]) => void;
@@ -218,9 +201,15 @@ export function createTerminal(
     w = dims.w;
     h = dims.h;
   }
+  // A browser opens at a roomy default-browser 16:9 size (distinct from
+  // terminal size): 1920×1080 content + the 36px chrome bar.
+  if (type === "browser") {
+    w = 1920;
+    h = 1080 + 36;
+  }
   return {
     id: generateId(),
-    title: title ?? (type === "shell" ? "Terminal" : type),
+    title: title ?? (type === "shell" ? "Terminal" : type === "browser" ? "Browser" : type),
     type,
     minimized: false,
     focused: false,
@@ -232,6 +221,7 @@ export function createTerminal(
     height: h,
     tags: [],
     origin,
+    ...(type === "browser" ? { url: "https://www.google.com" } : {}),
     ...(initialPrompt ? { initialPrompt } : {}),
     ...(autoApprove ? { autoApprove } : {}),
     ...(parentTerminalId ? { parentTerminalId } : {}),
@@ -255,9 +245,7 @@ function mapTerminals(
               ? w
               : {
                   ...w,
-                  terminals: w.terminals.map((t) =>
-                    t.id !== terminalId ? t : fn(t),
-                  ),
+                  terminals: w.terminals.map((t) => (t.id !== terminalId ? t : fn(t))),
                 },
           ),
         },
@@ -268,10 +256,7 @@ function markDirty() {
   useWorkspaceStore.getState().markDirty();
 }
 
-function syncProjectWorktrees(
-  project: ProjectData,
-  worktrees: ScannedWorktree[],
-): ProjectData {
+function syncProjectWorktrees(project: ProjectData, worktrees: ScannedWorktree[]): ProjectData {
   const existingByPath = new Map(project.worktrees.map((w) => [w.path, w]));
   const synced = worktrees.map((wt) => {
     const existing = existingByPath.get(wt.path);
@@ -316,9 +301,7 @@ function collectWorktreeTerminalIds(worktree: WorktreeData): string[] {
 }
 
 function collectProjectTerminalIds(project: ProjectData): string[] {
-  return project.worktrees.flatMap((worktree) =>
-    collectWorktreeTerminalIds(worktree),
-  );
+  return project.worktrees.flatMap((worktree) => collectWorktreeTerminalIds(worktree));
 }
 
 function cleanupRemovedTerminalIds(terminalIds: string[]) {
@@ -352,9 +335,7 @@ function resolveStructuralFocus(
     return normalized;
   }
 
-  const project = normalized.projects.find(
-    (candidate) => candidate.id === fallback.projectId,
-  );
+  const project = normalized.projects.find((candidate) => candidate.id === fallback.projectId);
   if (!project) {
     return normalized;
   }
@@ -367,9 +348,7 @@ function resolveStructuralFocus(
     };
   }
 
-  const worktree = project.worktrees.find(
-    (candidate) => candidate.id === fallback.worktreeId,
-  );
+  const worktree = project.worktrees.find((candidate) => candidate.id === fallback.worktreeId);
 
   return {
     ...normalized,
@@ -378,10 +357,7 @@ function resolveStructuralFocus(
   };
 }
 
-function inspectFocus(
-  projects: ProjectData[],
-  nextTerminalId: string | null,
-): FocusLookup {
+function inspectFocus(projects: ProjectData[], nextTerminalId: string | null): FocusLookup {
   let currentFocusedTerminalId: string | null = null;
   let nextProjectId: string | null = null;
   let nextWorktreeId: string | null = null;
@@ -425,8 +401,7 @@ function updateFocusedTerminalFlags(
       let worktreeChanged = false;
       const updatedTerminals = worktree.terminals.map((terminal) => {
         const touched =
-          terminal.id === previousFocusedTerminalId ||
-          terminal.id === nextFocusedTerminalId;
+          terminal.id === previousFocusedTerminalId || terminal.id === nextFocusedTerminalId;
         if (!touched) {
           return terminal;
         }
@@ -469,9 +444,7 @@ function findWorktreeTarget(
     return null;
   }
 
-  const worktree = project.worktrees.find(
-    (candidate) => candidate.id === worktreeId,
-  );
+  const worktree = project.worktrees.find((candidate) => candidate.id === worktreeId);
   if (!worktree) {
     return null;
   }
@@ -513,22 +486,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   removeProject: (projectId) => {
     let removedTerminalIds: string[] = [];
     set((state) => {
-      const removedProject = state.projects.find(
-        (project) => project.id === projectId,
-      );
+      const removedProject = state.projects.find((project) => project.id === projectId);
       if (!removedProject) {
         return state;
       }
 
       removedTerminalIds = collectProjectTerminalIds(removedProject);
-      const nextProjects = state.projects.filter(
-        (project) => project.id !== projectId,
-      );
+      const nextProjects = state.projects.filter((project) => project.id !== projectId);
       const nextFocus = resolveStructuralFocus(nextProjects, {
-        projectId:
-          state.focusedProjectId === projectId ? null : state.focusedProjectId,
-        worktreeId:
-          state.focusedProjectId === projectId ? null : state.focusedWorktreeId,
+        projectId: state.focusedProjectId === projectId ? null : state.focusedProjectId,
+        worktreeId: state.focusedProjectId === projectId ? null : state.focusedWorktreeId,
       });
 
       return {
@@ -544,9 +511,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   removeWorktree: (projectId, worktreeId) => {
     let removedTerminalIds: string[] = [];
     set((state) => {
-      const targetProject = state.projects.find(
-        (project) => project.id === projectId,
-      );
+      const targetProject = state.projects.find((project) => project.id === projectId);
       const removedWorktree = targetProject?.worktrees.find(
         (worktree) => worktree.id === worktreeId,
       );
@@ -560,14 +525,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
           ? project
           : {
               ...project,
-              worktrees: project.worktrees.filter(
-                (worktree) => worktree.id !== worktreeId,
-              ),
+              worktrees: project.worktrees.filter((worktree) => worktree.id !== worktreeId),
             },
       );
       const removedFocusedWorktree =
-        state.focusedProjectId === projectId &&
-        state.focusedWorktreeId === worktreeId;
+        state.focusedProjectId === projectId && state.focusedWorktreeId === worktreeId;
       const nextFocus = resolveStructuralFocus(nextProjects, {
         projectId: removedFocusedWorktree ? projectId : state.focusedProjectId,
         worktreeId: removedFocusedWorktree ? null : state.focusedWorktreeId,
@@ -585,9 +547,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   syncWorktrees: (projectPath, worktrees) => {
     const currentState = get();
-    const targetProject = currentState.projects.find(
-      (project) => project.path === projectPath,
-    );
+    const targetProject = currentState.projects.find((project) => project.path === projectPath);
     if (!targetProject) {
       return;
     }
@@ -636,10 +596,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       ];
       const taggedTerminal = {
         ...terminal,
-        tags: [
-          ...autoTags,
-          ...terminal.tags.filter((t) => t.startsWith("custom:")),
-        ],
+        tags: [...autoTags, ...terminal.tags.filter((t) => t.startsWith("custom:"))],
       };
       return {
         projects: state.projects.map((p) =>
@@ -648,9 +605,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             : {
                 ...p,
                 worktrees: p.worktrees.map((w) =>
-                  w.id !== worktreeId
-                    ? w
-                    : { ...w, terminals: [...w.terminals, taggedTerminal] },
+                  w.id !== worktreeId ? w : { ...w, terminals: [...w.terminals, taggedTerminal] },
                 ),
               },
         ),
@@ -702,11 +657,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
       if (adjacentTerminalId) {
         return {
-          projects: updateFocusedTerminalFlags(
-            updatedProjects,
-            null,
-            adjacentTerminalId,
-          ),
+          projects: updateFocusedTerminalFlags(updatedProjects, null, adjacentTerminalId),
         };
       }
 
@@ -735,25 +686,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       if (!terminal) return state;
 
       const nextMinimized = !terminal.minimized;
-      let projects = mapTerminals(
-        state.projects,
-        projectId,
-        worktreeId,
-        terminalId,
-        (t) => ({ ...t, minimized: nextMinimized }),
-      );
+      let projects = mapTerminals(state.projects, projectId, worktreeId, terminalId, (t) => ({
+        ...t,
+        minimized: nextMinimized,
+      }));
 
       if (nextMinimized && terminal.focused) {
-        const nextTerminalId = findNextVisibleTerminalId(
-          state.projects,
-          terminalId,
-          projects,
-        );
-        projects = updateFocusedTerminalFlags(
-          projects,
-          terminalId,
-          nextTerminalId,
-        );
+        const nextTerminalId = findNextVisibleTerminalId(state.projects, terminalId, projects);
+        projects = updateFocusedTerminalFlags(projects, terminalId, nextTerminalId);
         const lookup = inspectFocus(projects, nextTerminalId);
         return {
           focusedProjectId: lookup.nextProjectId,
@@ -775,50 +715,29 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     useTerminalRuntimeStateStore.getState().setSessionId(terminalId, sessionId);
   },
 
-  updateTerminalAutoApprove: (
-    projectId,
-    worktreeId,
-    terminalId,
-    autoApprove,
-  ) => {
+  updateTerminalAutoApprove: (projectId, worktreeId, terminalId, autoApprove) => {
     set((state) => ({
-      projects: mapTerminals(
-        state.projects,
-        projectId,
-        worktreeId,
-        terminalId,
-        (t) => ({ ...t, autoApprove: autoApprove || undefined }),
-      ),
+      projects: mapTerminals(state.projects, projectId, worktreeId, terminalId, (t) => ({
+        ...t,
+        autoApprove: autoApprove || undefined,
+      })),
     }));
     markDirty();
   },
 
   updateTerminalType: (projectId, worktreeId, terminalId, type) => {
     set((state) => ({
-      projects: mapTerminals(
-        state.projects,
-        projectId,
-        worktreeId,
-        terminalId,
-        (t) => withUpdatedTerminalType(t, type),
+      projects: mapTerminals(state.projects, projectId, worktreeId, terminalId, (t) =>
+        withUpdatedTerminalType(t, type),
       ),
     }));
     markDirty();
   },
 
-  updateTerminalCustomTitle: (
-    projectId,
-    worktreeId,
-    terminalId,
-    customTitle,
-  ) => {
+  updateTerminalCustomTitle: (projectId, worktreeId, terminalId, customTitle) => {
     set((state) => ({
-      projects: mapTerminals(
-        state.projects,
-        projectId,
-        worktreeId,
-        terminalId,
-        (t) => withUpdatedTerminalCustomTitle(t, customTitle),
+      projects: mapTerminals(state.projects, projectId, worktreeId, terminalId, (t) =>
+        withUpdatedTerminalCustomTitle(t, customTitle),
       ),
     }));
     markDirty();
@@ -837,15 +756,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     markDirty();
   },
 
+  updateTerminalUrl: (projectId, worktreeId, terminalId, url) => {
+    set((state) => ({
+      projects: mapTerminals(state.projects, projectId, worktreeId, terminalId, (t) => ({
+        ...t,
+        url,
+      })),
+    }));
+    markDirty();
+  },
+
   updateTerminalPosition: (projectId, worktreeId, terminalId, x, y) => {
     set((state) => ({
-      projects: mapTerminals(
-        state.projects,
-        projectId,
-        worktreeId,
-        terminalId,
-        (t) => ({ ...t, x, y }),
-      ),
+      projects: mapTerminals(state.projects, projectId, worktreeId, terminalId, (t) => ({
+        ...t,
+        x,
+        y,
+      })),
     }));
     markDirty();
   },
@@ -855,10 +782,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       return;
     }
 
-    const grouped = new Map<
-      string,
-      Map<string, { x: number; y: number }>
-    >();
+    const grouped = new Map<string, Map<string, { x: number; y: number }>>();
     for (const update of updates) {
       const worktreeKey = `${update.projectId}::${update.worktreeId}`;
       let terminals = grouped.get(worktreeKey);
@@ -907,13 +831,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   updateTerminalSize: (projectId, worktreeId, terminalId, width, height) => {
     set((state) => ({
-      projects: mapTerminals(
-        state.projects,
-        projectId,
-        worktreeId,
-        terminalId,
-        (t) => ({ ...t, width, height }),
-      ),
+      projects: mapTerminals(state.projects, projectId, worktreeId, terminalId, (t) => ({
+        ...t,
+        width,
+        height,
+      })),
+    }));
+    markDirty();
+  },
+
+  updateTerminalBounds: (projectId, worktreeId, terminalId, bounds) => {
+    set((state) => ({
+      projects: mapTerminals(state.projects, projectId, worktreeId, terminalId, (terminal) => ({
+        ...terminal,
+        ...bounds,
+      })),
     }));
     markDirty();
   },
@@ -921,12 +853,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   addTerminalTag: (projectId, worktreeId, terminalId, tag) => {
     if (!tag.startsWith("custom:")) return;
     set((state) => ({
-      projects: mapTerminals(
-        state.projects,
-        projectId,
-        worktreeId,
-        terminalId,
-        (t) => (t.tags.includes(tag) ? t : { ...t, tags: [...t.tags, tag] }),
+      projects: mapTerminals(state.projects, projectId, worktreeId, terminalId, (t) =>
+        t.tags.includes(tag) ? t : { ...t, tags: [...t.tags, tag] },
       ),
     }));
     markDirty();
@@ -935,13 +863,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   removeTerminalTag: (projectId, worktreeId, terminalId, tag) => {
     if (!tag.startsWith("custom:")) return;
     set((state) => ({
-      projects: mapTerminals(
-        state.projects,
-        projectId,
-        worktreeId,
-        terminalId,
-        (t) => ({ ...t, tags: t.tags.filter((existing) => existing !== tag) }),
-      ),
+      projects: mapTerminals(state.projects, projectId, worktreeId, terminalId, (t) => ({
+        ...t,
+        tags: t.tags.filter((existing) => existing !== tag),
+      })),
     }));
     markDirty();
   },
@@ -959,9 +884,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                 const visibleSlots = terminals.flatMap((terminal, index) =>
                   terminal.stashed ? [] : [index],
                 );
-                const visibleTerminals = visibleSlots.map(
-                  (index) => terminals[index],
-                );
+                const visibleTerminals = visibleSlots.map((index) => terminals[index]);
                 const oldVisibleIndex = visibleTerminals.findIndex(
                   (terminal) => terminal.id === terminalId,
                 );
@@ -1000,8 +923,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }
 
     set((state) => {
-      const { currentFocusedTerminalId, nextProjectId, nextWorktreeId } =
-        focusLookup;
+      const { currentFocusedTerminalId, nextProjectId, nextWorktreeId } = focusLookup;
       const focusedProjects = updateFocusedTerminalFlags(
         state.projects,
         currentFocusedTerminalId,
@@ -1027,18 +949,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         projects,
       };
     });
-    if (
-      terminalId &&
-      options?.focusInput !== false &&
-      options?.focusComposer !== false
-    ) {
+    if (terminalId && options?.focusInput !== false && options?.focusComposer !== false) {
       const composerEnabled = usePreferencesStore.getState().composerEnabled;
       if (composerEnabled) {
         window.dispatchEvent(new CustomEvent("casprflowos:focus-composer"));
       } else {
-        window.dispatchEvent(
-          new CustomEvent("casprflowos:focus-xterm", { detail: terminalId }),
-        );
+        window.dispatchEvent(new CustomEvent("casprflowos:focus-xterm", { detail: terminalId }));
       }
     }
     logSlowRendererPath("projectStore.setFocusedTerminal", startedAt, {
@@ -1068,11 +984,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         currentFocusedTerminalId,
         null,
       );
-      const projects = expandFocusedWorktreeAncestors(
-        focusedProjects,
-        projectId,
-        worktreeId,
-      );
+      const projects = expandFocusedWorktreeAncestors(focusedProjects, projectId, worktreeId);
 
       if (
         projects === state.projects &&
@@ -1094,11 +1006,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     setTrackSidebar(false);
     set((state) => {
       const { currentFocusedTerminalId } = inspectFocus(state.projects, null);
-      const projects = updateFocusedTerminalFlags(
-        state.projects,
-        currentFocusedTerminalId,
-        null,
-      );
+      const projects = updateFocusedTerminalFlags(state.projects, currentFocusedTerminalId, null);
 
       if (
         projects === state.projects &&
@@ -1223,10 +1131,9 @@ useProjectStore.subscribe((state, prev) => {
   }
 
   const selectionState = useSelectionStore.getState();
-  const nextSelectedItems = filterValidSelectedItems(
-    selectionState.selectedItems,
-    { projects: state.projects },
-  );
+  const nextSelectedItems = filterValidSelectedItems(selectionState.selectedItems, {
+    projects: state.projects,
+  });
 
   if (!sameSelectedItems(selectionState.selectedItems, nextSelectedItems)) {
     useSelectionStore.setState({ selectedItems: nextSelectedItems });
@@ -1235,11 +1142,7 @@ useProjectStore.subscribe((state, prev) => {
 
 // --- Stash helpers (single source of truth: projectStore.stashed flag) ---
 
-export function stashTerminal(
-  projectId: string,
-  worktreeId: string,
-  terminalId: string,
-): void {
+export function stashTerminal(projectId: string, worktreeId: string, terminalId: string): void {
   const now = Date.now();
   useProjectStore.setState((state) => ({
     projects: state.projects.map((p) =>
@@ -1278,9 +1181,7 @@ export function unstashTerminal(terminalId: string): void {
       worktrees: p.worktrees.map((w) => ({
         ...w,
         terminals: w.terminals.map((t) =>
-          t.id !== terminalId
-            ? t
-            : { ...t, stashed: false, stashedAt: undefined },
+          t.id !== terminalId ? t : { ...t, stashed: false, stashedAt: undefined },
         ),
       })),
     })),
@@ -1366,9 +1267,7 @@ export function destroyStashedTerminal(terminalId: string): void {
   const items = getStashedTerminals();
   const entry = items.find((e) => e.terminal.id === terminalId);
   if (entry) {
-    useProjectStore
-      .getState()
-      .removeTerminal(entry.projectId, entry.worktreeId, terminalId);
+    useProjectStore.getState().removeTerminal(entry.projectId, entry.worktreeId, terminalId);
     return;
   }
   cleanupRemovedTerminalIds([terminalId]);

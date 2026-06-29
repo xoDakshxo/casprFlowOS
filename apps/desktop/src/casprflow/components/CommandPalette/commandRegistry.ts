@@ -19,7 +19,7 @@ import {
   fitAllProjects,
   setZoomToHundred,
 } from "../../canvas/zoomActions";
-import { createBrowserCardInScene } from "../../actions/sceneCardActions";
+import { spawnAgent } from "../agentIcons";
 import {
   stashTerminalInScene,
   toggleTerminalStarredInScene,
@@ -391,7 +391,7 @@ function actionCommands(ctx: CommandContext): PaletteCommand[] {
       title: t["palette.cmd.add_browser"],
       keywords: ["web", "open browser", "internet"],
       perform: () => {
-        createBrowserCardInScene("https://google.com");
+        spawnAgent("browser");
       },
     });
   }

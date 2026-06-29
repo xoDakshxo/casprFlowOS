@@ -36,9 +36,9 @@ export const useThemeStore = create<ThemeStore>((set) => ({
 
 export const XTERM_THEMES: Record<Theme, ITheme> = {
   dark: {
-    // Translucent so the canvas faintly shows through (paired with xterm
-    // allowTransparency). Kept high-alpha so terminal text stays legible.
-    background: "rgba(20, 19, 18, 0.78)",
+    // DOM renderer + allowTransparency lets the terminal body inherit the
+    // translucent tile surface, so the canvas shows through as real glass.
+    background: "rgba(0, 0, 0, 0)",
     foreground: "#e4e2df",
     cursor: "#e4e2df",
     cursorAccent: "#1a1918",
@@ -61,7 +61,7 @@ export const XTERM_THEMES: Record<Theme, ITheme> = {
     brightWhite: "#f0eeeb",
   },
   light: {
-    background: "rgba(234, 232, 228, 0.82)",
+    background: "rgba(0, 0, 0, 0)",
     foreground: "#1c1917",
     cursor: "#1c1917",
     cursorAccent: "#eae8e4",

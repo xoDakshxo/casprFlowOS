@@ -38,7 +38,17 @@ export type TerminalType =
   | "opencode"
   | "wuu"
   | "lazygit"
-  | "tmux";
+  | "tmux"
+  // A browser is just another canvas window — same model as a terminal, but it
+  // renders a webview instead of a shell. It flows through the identical
+  // placement / grid / arrange / framing machinery.
+  | "browser";
+
+/**
+ * Things that can be spawned onto the canvas from the dock / App Launcher.
+ * Every one is a canvas window (TerminalType), including the browser.
+ */
+export type AppId = TerminalType;
 
 export interface Position {
   x: number;
@@ -139,6 +149,8 @@ export interface TerminalData {
   autoApprove?: boolean;
   stashed?: boolean;
   stashedAt?: number;
+  /** Browser windows (type === "browser") remember their current URL. */
+  url?: string;
 }
 
 export interface TerminalRuntimeState {
@@ -1073,6 +1085,9 @@ export interface CasprFlowOSAPI {
     platform: "darwin" | "win32" | "linux";
     requestClose: () => void;
     setQuitOnLastWindowClosed: (value: boolean) => void;
+    onToolbarMetrics: (
+      listener: (metrics: { left: number }) => void,
+    ) => () => void;
   };
   hooks: {
     getSocketPath: () => Promise<string | null>;

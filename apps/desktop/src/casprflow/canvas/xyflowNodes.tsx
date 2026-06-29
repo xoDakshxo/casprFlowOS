@@ -1,27 +1,29 @@
-import { useCallback, useMemo, useState } from "react";
-import {
-  type Node,
-  type NodeProps,
-  type NodeTypes,
-  NodeResizer,
-} from "@xyflow/react";
+import { type CSSProperties, useCallback, useMemo } from "react";
+import { type Node, type NodeProps, type NodeTypes, NodeResizer } from "@xyflow/react";
 import { useProjectStore } from "../stores/projectStore";
 import { useCanvasStore } from "../stores/canvasStore";
 import { usePinStore } from "../stores/pinStore";
 import { usePreferencesStore } from "../stores/preferencesStore";
+import { useSelectionStore } from "../stores/selectionStore";
 import { useViewportFocusStore } from "../stores/viewportFocusStore";
 import { TerminalTile } from "../terminal/TerminalTile";
+import { BrowserWindow } from "../components/BrowserWindow";
+import { shouldBrowserCaptureInput } from "../components/browserInteraction";
 import { resolveTerminalMountMode } from "../terminal/terminalRuntimePolicy";
-import {
-  fitTerminalRuntime,
-  useTerminalRuntimeStore,
-} from "../terminal/terminalRuntimeStore";
+import { fitTerminalRuntime, useTerminalRuntimeStore } from "../terminal/terminalRuntimeStore";
 import { panToTerminal } from "../utils/panToTerminal";
 import { type TerminalNodeData, type CanvasFlowNode } from "./nodeProjection";
 import { rectIntersectsCanvasViewport } from "./viewportBounds";
 import { resolveCollisions } from "./collisionResolver";
 
 const SNAP_GRID = 10;
+const RESIZE_HANDLE_STYLE: CSSProperties = {
+  width: "var(--canvas-resize-handle-size)",
+  height: "var(--canvas-resize-handle-size)",
+  background: "var(--surface)",
+  borderColor: "var(--border-hover)",
+  borderRadius: "var(--radius-pill)",
+};
 
 function snapTo(value: number, grid: number): number {
   return Math.round(value / grid) * grid;
@@ -30,19 +32,12 @@ function snapTo(value: number, grid: number): number {
 type TerminalFlowNode = Node<TerminalNodeData, "terminal">;
 
 function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
-  const [hovered, setHovered] = useState(false);
   const viewport = useCanvasStore((state) => state.viewport);
-  const rightPanelCollapsed = useCanvasStore(
-    (state) => state.rightPanelCollapsed,
-  );
-  const leftPanelCollapsed = useCanvasStore(
-    (state) => state.leftPanelCollapsed,
-  );
+  const rightPanelCollapsed = useCanvasStore((state) => state.rightPanelCollapsed);
+  const leftPanelCollapsed = useCanvasStore((state) => state.leftPanelCollapsed);
   const leftPanelWidth = useCanvasStore((state) => state.leftPanelWidth);
   const rightPanelWidth = useCanvasStore((state) => state.rightPanelWidth);
-  const taskDrawerOpen = usePinStore(
-    (state) => state.openProjectPath !== null,
-  );
+  const taskDrawerOpen = usePinStore((state) => state.openProjectPath !== null);
 
   const terminal = useProjectStore(
     useCallback(
@@ -70,11 +65,16 @@ function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
     ),
   );
 
-  const updateTerminalSize = useProjectStore(
-    (state) => state.updateTerminalSize,
-  );
-  const updateTerminalPosition = useProjectStore(
-    (state) => state.updateTerminalPosition,
+  const updateTerminalSize = useProjectStore((state) => state.updateTerminalSize);
+  const updateTerminalPosition = useProjectStore((state) => state.updateTerminalPosition);
+  const selected = useSelectionStore(
+    useCallback(
+      (state) =>
+        state.selectedItems.some(
+          (item) => item.type === "terminal" && item.terminalId === data.terminalId,
+        ),
+      [data.terminalId],
+    ),
   );
 
   const visible = useMemo(() => {
@@ -113,10 +113,7 @@ function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   // Live resize: update the store on every frame so the inner TerminalTile
   // follows the React Flow wrapper while the user drags a handle.
   const handleResize = useCallback(
-    (
-      _event: unknown,
-      params: { x: number; y: number; width: number; height: number },
-    ) => {
+    (_event: unknown, params: { x: number; y: number; width: number; height: number }) => {
       updateTerminalPosition(
         data.projectId,
         data.worktreeId,
@@ -142,10 +139,7 @@ function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
   );
 
   const handleResizeEnd = useCallback(
-    (
-      _event: unknown,
-      params: { x: number; y: number; width: number; height: number },
-    ) => {
+    (_event: unknown, params: { x: number; y: number; width: number; height: number }) => {
       const snappedX = snapTo(params.x, SNAP_GRID);
       const snappedY = snapTo(params.y, SNAP_GRID);
       const snappedW = snapTo(params.width, SNAP_GRID);
@@ -157,22 +151,14 @@ function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
         snappedX,
         snappedY,
       );
-      updateTerminalSize(
-        data.projectId,
-        data.worktreeId,
-        data.terminalId,
-        snappedW,
-        snappedH,
-      );
+      updateTerminalSize(data.projectId, data.worktreeId, data.terminalId, snappedW, snappedH);
 
       // Remember this as the user's preferred size for future new
       // terminals. Sanitizer in preferencesStore rejects implausible
       // values (e.g. near-zero), so we can write unconditionally here
       // and not worry about corrupting the pref from an accidental
       // zero-sized resize.
-      usePreferencesStore
-        .getState()
-        .setDefaultTerminalSize({ w: snappedW, h: snappedH });
+      usePreferencesStore.getState().setDefaultTerminalSize({ w: snappedW, h: snappedH });
 
       // Resolve collisions after resize
       const projects = useProjectStore.getState().projects;
@@ -238,22 +224,40 @@ function TerminalNode({ data }: NodeProps<TerminalFlowNode>) {
     return null;
   }
 
+  if (terminal.type === "browser") {
+    const interactive = shouldBrowserCaptureInput(terminal.focused, selected);
+
+    return (
+      <div className="h-full w-full">
+        <NodeResizer
+          handleClassName="cf-resize-control"
+          isVisible={selected}
+          lineClassName="cf-resize-control"
+          minWidth={320}
+          minHeight={240}
+          handleStyle={RESIZE_HANDLE_STYLE}
+          onResize={handleResize}
+          onResizeEnd={handleResizeEnd}
+        />
+        <BrowserWindow
+          interactive={interactive}
+          projectId={data.projectId}
+          worktreeId={data.worktreeId}
+          terminal={terminal}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div
-      className="h-full w-full"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <div className="h-full w-full">
       <NodeResizer
-        isVisible={hovered}
+        handleClassName="cf-resize-control"
+        isVisible={selected}
+        lineClassName="cf-resize-control"
         minWidth={300}
         minHeight={200}
-        handleStyle={{
-          width: 8,
-          height: 8,
-          background: "var(--surface)",
-          borderColor: "var(--border-hover)",
-        }}
+        handleStyle={RESIZE_HANDLE_STYLE}
         onResize={handleResize}
         onResizeEnd={handleResizeEnd}
       />

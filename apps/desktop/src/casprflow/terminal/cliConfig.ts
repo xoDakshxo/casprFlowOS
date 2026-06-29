@@ -228,6 +228,11 @@ export const TERMINAL_CONFIG: Record<TerminalType, TerminalAdapterConfig> = {
       pasteStrategy: "separate",
     },
   },
+  // Browser windows have no shell/composer — they render a webview.
+  browser: {
+    type: "browser",
+    composer: NO_COMPOSER,
+  },
 };
 
 export function getTerminalLaunchOptions(

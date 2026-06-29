@@ -49,6 +49,7 @@ const COMMANDS_BY_TYPE: Record<TerminalType, readonly SlashCommand[]> = {
   wuu: NO_COMMANDS,
   lazygit: NO_COMMANDS,
   tmux: NO_COMMANDS,
+  browser: NO_COMMANDS,
 };
 
 export function getSlashCommands(type: TerminalType): readonly SlashCommand[] {

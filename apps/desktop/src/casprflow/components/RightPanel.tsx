@@ -6,7 +6,8 @@ import {
   useEffect,
   useLayoutEffect,
 } from "react";
-import { useCanvasStore, COLLAPSED_TAB_WIDTH } from "../stores/canvasStore";
+import { useCanvasStore } from "../stores/canvasStore";
+import { usePanelHoverStore } from "../stores/panelHoverStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useT } from "../i18n/useT";
 import { useNotificationStore } from "../stores/notificationStore";
@@ -14,6 +15,7 @@ import { FilesContent } from "./RightPanel/FilesContent";
 import { DiffContent } from "./RightPanel/DiffContent";
 import { GitContent } from "./RightPanel/GitContent";
 import { MemoryContent } from "./RightPanel/MemoryContent";
+import { BrowserContent } from "./RightPanel/BrowserContent";
 import { panToTerminal } from "../utils/panToTerminal";
 import {
   PANEL_TRANSITION_DURATION_MS,
@@ -79,11 +81,21 @@ function IconMemory({ size = 14 }: { size?: number }) {
   );
 }
 
-const TAB_CONFIG: { id: RightPanelTab; icon: typeof IconFiles; labelKey: "left_panel_files" | "left_panel_diff" | "left_panel_git" | "left_panel_memory" }[] = [
+function IconBrowser({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="8" cy="8" r="6" />
+      <path d="M2 8h12M8 2c1.8 1.6 2.8 3.7 2.8 6S9.8 12.4 8 14M8 2C6.2 3.6 5.2 5.7 5.2 8S6.2 12.4 8 14" />
+    </svg>
+  );
+}
+
+const TAB_CONFIG: { id: RightPanelTab; icon: typeof IconFiles; labelKey: "left_panel_files" | "left_panel_diff" | "left_panel_git" | "left_panel_memory" | "left_panel_browser" }[] = [
   { id: "files", icon: IconFiles, labelKey: "left_panel_files" },
   { id: "diff", icon: IconDiff, labelKey: "left_panel_diff" },
   { id: "git", icon: IconGit, labelKey: "left_panel_git" },
   { id: "memory", icon: IconMemory, labelKey: "left_panel_memory" },
+  { id: "browser", icon: IconBrowser, labelKey: "left_panel_browser" },
 ];
 
 export function RightPanel() {
@@ -315,7 +327,11 @@ export function RightPanel() {
         // Handle lives on the LEFT edge of the right panel, so dragging
         // the cursor RIGHT (clientX increases) SHRINKS the panel and
         // dragging LEFT GROWS it — inverse of the left panel.
-        setWidth(Math.max(200, Math.min(600, origW - (ev.clientX - startX))));
+        // Cap relative to the window (leave ~320px for the left rail + a sliver
+        // of canvas) instead of a hard 600px, so the panel — and the Browser
+        // tab inside it — can expand much wider.
+        const maxW = Math.max(400, window.innerWidth - 320);
+        setWidth(Math.max(259, Math.min(maxW, origW - (ev.clientX - startX))));
       };
       const cleanup = () => {
         handle.removeEventListener("pointermove", handleMove);
@@ -395,7 +411,15 @@ export function RightPanel() {
   // two states is ever in the DOM, so there are no persistent
   // compositor layers that can get stuck unpainted after a
   // foreground/background switch.
-  const displayedWidth = collapsed ? COLLAPSED_TAB_WIDTH : width;
+  // pinned = clicked open (insets canvas, glass bg). preview = hover overlay
+  // (floats over the canvas, opaque bg, auto-closes). Visible when either.
+  const pinned = !collapsed;
+  const preview = usePanelHoverStore((s) => s.rightPreview);
+  const openPreview = usePanelHoverStore((s) => s.openPreview);
+  const closePreviewSoon = usePanelHoverStore((s) => s.closePreviewSoon);
+  const visible = pinned || preview;
+  const isOverlay = preview && !pinned;
+  const displayedWidth = visible ? width : 0;
   const widthTransition = dragging
     ? undefined
     : "width 240ms cubic-bezier(0.22, 0.61, 0.36, 1)";
@@ -404,70 +428,28 @@ export function RightPanel() {
     <>
     <div
       className="caspr-rail caspr-rail--right fixed right-0 z-40 overflow-hidden"
+      data-overlay={isOverlay ? "true" : undefined}
       style={{
         top: 44,
         height: "calc(100vh - 44px)",
         width: displayedWidth,
         transition: widthTransition,
       }}
+      onMouseEnter={() => openPreview("right")}
+      onMouseLeave={() => closePreviewSoon("right")}
       onDragOver={(e) => {
-        if (!collapsed) return;
+        if (pinned) return;
         if (!Array.from(e.dataTransfer.types).includes("Files")) return;
         e.preventDefault();
         setActiveTab("files");
         setCollapsed(false);
       }}
     >
-      {/* Both branches stay mounted — toggling display preserves the
-          expanded surface's component state (FilesContent's tree model,
-          expansion, scroll, ignored stream cache) across panel collapses,
-          so re-expanding is instant rather than a fresh load. */}
-      <div style={{ display: collapsed ? "contents" : "none" }}>
-        {/* Collapsed strip — anchored to the right edge so its icons
-            stay visible as the panel narrows. */}
-        <div
-          className="cf-row-hover absolute inset-y-0 right-0 flex flex-col items-center pt-3 gap-1 cursor-pointer"
-          style={{ width: COLLAPSED_TAB_WIDTH }}
-          onClick={() => setCollapsed(false)}
-        >
-          {TAB_CONFIG.map(({ id, icon: Icon }) => (
-            <button
-              key={id}
-              className={`cf-row-icon flex items-center justify-center w-6 h-6 rounded-md ${
-                activeTab === id
-                  ? "text-[var(--accent)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              }`}
-              title={t[`left_panel_${id}` as keyof typeof t] as string}
-              onClick={(e) => {
-                e.stopPropagation();
-                setActiveTab(id);
-                setCollapsed(false);
-              }}
-            >
-              <Icon size={14} />
-            </button>
-          ))}
-          <div className="mt-auto mb-3">
-            <button
-              className="cf-row-icon flex items-center justify-center w-6 h-6 rounded-md text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-              onClick={(e) => {
-                e.stopPropagation();
-                setCollapsed(false);
-              }}
-            >
-              {/* Points LEFT — clicking expands the right panel leftward. */}
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M7 2L3 5L7 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div style={{ display: collapsed ? "none" : "contents" }}>
-        {/* Expanded surface — laid out at the user-configured width so
-            content does not reflow while the outer width animates;
-            the outer overflow-hidden clips it during the transition. */}
+      {/* Expanded surface — always mounted (preserves FilesContent's tree
+          model, scroll, ignored-stream cache across open/close) and laid out at
+          the user-configured width so content does not reflow while the outer
+          width animates; the outer overflow-hidden clips it during the slide. */}
+      <div style={{ display: "contents" }}>
         <div
           className="absolute inset-y-0 right-0 flex flex-col"
           style={{ width }}
@@ -626,6 +608,14 @@ export function RightPanel() {
             worktreePath={effectiveWorktreePath}
             onFileClick={handleFileClick}
           />
+        </div>
+        {/* Browser stays mounted so the page survives tab switches; scoped to
+            the active worktree (like the other tabs). */}
+        <div
+          className="min-h-0 flex-1"
+          style={{ display: activeTab === "browser" ? "flex" : "none" }}
+        >
+          <BrowserContent worktreePath={effectiveWorktreePath} />
         </div>
         {showRepoContextPlaceholder ? (
           <div className="flex flex-1 items-center justify-center">

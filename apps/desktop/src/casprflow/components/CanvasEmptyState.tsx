@@ -28,58 +28,80 @@ export function CanvasEmptyState({ isDragOver = false }: CanvasEmptyStateProps) 
 
   return (
     <div
-      className="absolute inset-0 flex justify-center pointer-events-none select-none"
-      style={{ paddingTop: "30vh" }}
+      className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
     >
+      {/* Rounded dark-glass pane behind the casprOS branding. */}
       <div
-        className="cf-stagger pointer-events-auto"
-        style={{ ...STAGGER_STYLE, width: "min(360px, 80vw)" }}
+        className="cf-stagger cf-enter-fade-up pointer-events-auto flex flex-col items-center text-center"
+        style={{
+          ...STAGGER_STYLE,
+          gap: 12,
+          padding: "38px 48px 30px",
+          borderRadius: 22,
+          backgroundColor: "var(--glass-pane)",
+          border: "1px solid var(--glass-edge-soft)",
+          boxShadow:
+            "inset 0 1px 0 var(--glass-edge), 0 28px 80px -24px rgba(0,0,0,0.6)",
+          maxWidth: "min(420px, 86vw)",
+        }}
       >
-        <div
-          className="cf-enter-fade-up cf-eyebrow"
-          style={{ color: "var(--text-faint)", marginBottom: 20 }}
-        >
+        {/* casprOS mark — no box; the pane is the only surface. */}
+        <img
+          src="/casprlogo.svg"
+          alt="casprOS"
+          width={58}
+          height={58}
+          draggable={false}
+          style={{ opacity: 0.95 }}
+        />
+        <div className="cf-eyebrow" style={{ color: "var(--text-muted)" }}>
           {t.canvas_empty_eyebrow}
         </div>
-        <div
-          className="cf-enter-fade-up cf-hero"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          {t.canvas_empty_line_lead}
+        <div>
+          <div className="cf-hero" style={{ color: "var(--text-secondary)" }}>
+            {t.canvas_empty_line_lead}
+          </div>
+          <div className="cf-hero" style={{ color: "var(--text-primary)" }}>
+            {t.canvas_empty_line_call}
+          </div>
         </div>
-        <div
-          className="cf-enter-fade-up cf-hero"
-          style={{ color: "var(--text-primary)", marginBottom: 32 }}
-        >
-          {t.canvas_empty_line_call}
-        </div>
-        <div
-          className="cf-enter-fade-up cf-mono flex items-center gap-3"
+        <button
+          type="button"
+          className="cf-canvas-empty-cta cf-mono"
+          data-dragover={isDragOver ? "true" : "false"}
+          onClick={handleOpen}
+          aria-label={t.canvas_empty_action}
           style={{
+            marginTop: 6,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            borderRadius: 10,
             fontSize: "var(--text-sm)",
-            color: "var(--text-muted)",
+            color: "var(--text-secondary)",
+            backgroundColor: "var(--accent-soft)",
+            border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+            cursor: "pointer",
           }}
         >
-          <span
-            className="cf-canvas-empty-drag-hint"
-            data-dragover={isDragOver ? "true" : "false"}
-          >
-            {t.canvas_empty_drag_hint}
-          </span>
+          <span>{t.canvas_empty_drag_hint}</span>
           <span aria-hidden style={{ color: "var(--text-faint)" }}>
             ·
           </span>
           <span>{t.canvas_empty_or}</span>
-          <button
-            type="button"
-            className="cf-kbd"
-            data-dragover={isDragOver ? "true" : "false"}
-            onClick={handleOpen}
-            aria-label={t.canvas_empty_action}
-          >
+          <kbd className="cf-kbd" style={{ pointerEvents: "none" }}>
             {shortcutLabel}
-          </button>
-        </div>
+          </kbd>
+          {/* Arrow nudging toward the action. */}
+          <span
+            aria-hidden
+            className="cf-canvas-empty-arrow"
+            style={{ color: "var(--accent)", fontWeight: 600 }}
+          >
+            →
+          </span>
+        </button>
       </div>
     </div>
   );

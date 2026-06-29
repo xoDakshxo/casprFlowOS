@@ -2,7 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { createTerminalInScene } from "../actions/terminalSceneActions";
 import { useProjectStore } from "../stores/projectStore";
 import { TERMINAL_TYPE_CONFIG } from "../terminal/terminalTypeConfig";
-import type { TerminalType } from "../types";
+import type { AppId } from "../types";
 
 /*
  * Shared agent definitions + branded app-style icons, used by both the
@@ -10,7 +10,7 @@ import type { TerminalType } from "../types";
  */
 
 export interface AgentDef {
-  type: TerminalType;
+  type: AppId;
   label: string;
   description: string;
 }
@@ -31,18 +31,16 @@ export const ALL_AGENTS: AgentDef[] = [
   { type: "kimi", label: "Kimi", description: "Moonshot Kimi" },
   { type: "opencode", label: "OpenCode", description: "OpenCode agent" },
   { type: "shell", label: "Terminal", description: "Plain shell" },
+  { type: "browser", label: "Browser", description: "Portable web browser" },
 ];
 
 const AGENT_BY_TYPE = new Map(ALL_AGENTS.map((a) => [a.type, a]));
 
-export function getAgentDef(type: TerminalType): AgentDef {
-  return (
-    AGENT_BY_TYPE.get(type) ?? {
-      type,
-      label: TERMINAL_TYPE_CONFIG[type]?.label ?? type,
-      description: "",
-    }
-  );
+export function getAgentDef(type: AppId): AgentDef {
+  const known = AGENT_BY_TYPE.get(type);
+  if (known) return known;
+  const cfg = type === "browser" ? undefined : TERMINAL_TYPE_CONFIG[type];
+  return { type, label: cfg?.label ?? type, description: "" };
 }
 
 function Tile({
@@ -124,6 +122,18 @@ function ShellIcon() {
   );
 }
 
+function BrowserIcon() {
+  return (
+    <Tile bg="linear-gradient(160deg,#3a8bff 0%,#1f5fd6 100%)" ring="rgba(0,0,0,0.16)">
+      <svg width="58%" height="58%" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="9" stroke="#ffffff" strokeWidth="1.7" />
+        <ellipse cx="12" cy="12" rx="4" ry="9" stroke="#ffffff" strokeWidth="1.5" />
+        <path d="M3 12h18" stroke="#ffffff" strokeWidth="1.5" />
+      </svg>
+    </Tile>
+  );
+}
+
 export function DrawerIcon() {
   const dots = [0, 1, 2].flatMap((r) => [0, 1, 2].map((c) => ({ r, c })));
   return (
@@ -145,15 +155,20 @@ export function DrawerIcon() {
   );
 }
 
-const AGENT_ICONS: Partial<Record<TerminalType, () => ReactElement>> = {
+const AGENT_ICONS: Partial<Record<AppId, () => ReactElement>> = {
   claude: ClaudeIcon,
   codex: CodexIcon,
   gemini: GeminiIcon,
   shell: ShellIcon,
+  browser: BrowserIcon,
 };
 
-function FallbackIcon({ type }: { type: TerminalType }) {
-  const cfg = TERMINAL_TYPE_CONFIG[type] ?? { color: "#888", label: type };
+function FallbackIcon({ type }: { type: AppId }) {
+  const cfg =
+    (type === "browser" ? undefined : TERMINAL_TYPE_CONFIG[type]) ?? {
+      color: "#888",
+      label: type,
+    };
   return (
     <Tile bg="linear-gradient(160deg,#23262b 0%,#101113 100%)">
       <span
@@ -171,14 +186,16 @@ function FallbackIcon({ type }: { type: TerminalType }) {
   );
 }
 
-export function AgentGlyph({ type }: { type: TerminalType }) {
+export function AgentGlyph({ type }: { type: AppId }) {
   const Icon = AGENT_ICONS[type];
   return Icon ? <Icon /> : <FallbackIcon type={type} />;
 }
 
-// Spawn an agent into the focused worktree (falls back to the first project's
-// first worktree). No-op if nothing is open yet.
-export function spawnAgent(type: TerminalType): boolean {
+// Spawn a window (agent or browser) onto the canvas. The browser is just
+// another terminal type, so it flows through the same placement/arrange path.
+// Falls back to the focused worktree (or the first project's first worktree)
+// and no-ops if nothing is open yet.
+export function spawnAgent(type: AppId): boolean {
   const { projects, focusedProjectId, focusedWorktreeId } =
     useProjectStore.getState();
 

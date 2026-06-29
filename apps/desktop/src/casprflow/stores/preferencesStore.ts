@@ -206,10 +206,7 @@ function loadPreferences(): SavedPrefs {
       const ff = parsed.terminalFontFamily;
       if (typeof ff === "string" && ff.length > 0) fontFamily = ff;
 
-      let terminalRenderer: TerminalRendererMode = "webgl";
-      if (parsed.terminalRenderer === "dom") {
-        terminalRenderer = "dom";
-      }
+      const terminalRenderer: TerminalRendererMode = "dom";
 
       let terminalEngine: TerminalEngine = "xterm";
       if (parsed.terminalEngine === "wterm") {
@@ -303,7 +300,7 @@ function loadPreferences(): SavedPrefs {
     animationBlur: DEFAULT_BLUR,
     terminalFontSize: DEFAULT_FONT_SIZE,
     terminalFontFamily: "geist-mono",
-    terminalRenderer: "webgl",
+    terminalRenderer: "dom",
     terminalEngine: "xterm",
     composerEnabled: false,
     drawingEnabled: false,
@@ -478,9 +475,9 @@ export const usePreferencesStore = create<PreferencesStore>((set, get) => ({
     set({ terminalFontFamily: fontId });
     savePreferences(getSaveState({ ...get(), terminalFontFamily: fontId }));
   },
-  setTerminalRenderer: (mode) => {
-    set({ terminalRenderer: mode });
-    savePreferences(getSaveState({ ...get(), terminalRenderer: mode }));
+  setTerminalRenderer: () => {
+    set({ terminalRenderer: "dom" });
+    savePreferences(getSaveState({ ...get(), terminalRenderer: "dom" }));
   },
   setTerminalEngine: (engine) => {
     set({ terminalEngine: engine });

@@ -6,10 +6,12 @@
        so it sits INSIDE the chrome (below the toolbar, between the rails) — it
        never lives behind the chrome.
      • Everything AROUND it — top bar + left rail + right rail — is ONE
-       continuous translucent glass frame. It is transparent to the OUTSIDE
-       (the macOS desktop shows through via the window's native vibrancy), not
-       to the canvas. No CSS backdrop-filter — the native vibrancy is the only
-       blur, so there's no smeary "moving overlay" artifact.
+       continuous translucent glass frame. It is FROSTED GLASS over the canvas
+       WALLPAPER: a full-window wallpaper layer (.cf-app-wallpaper) sits behind
+       all the chrome, and the frame blurs it through backdrop-filter. It is no
+       longer transparent to the macOS desktop — the wallpaper is what shows
+       through, blurred, faintly behind a dark codex-black tint kept opaque
+       enough that the menus stay legible.
      • No hard separators between the frame pieces: they share one tint and meet
        seamlessly, so the surround reads as a single fluid surface.
 
@@ -23,6 +25,10 @@
   /* Codex-black canvas. Solid/opaque: the centre reads as codex black and the
      desktop never bleeds into it. */
   --bg: #131110;
+
+  /* Translucent fill behind the (transparent) xterm so the terminal reads as
+     glass — the canvas shows faintly through while text stays crisp. */
+  --terminal-bg: rgba(20, 19, 18, 0.55);
 
   /* Inner fills, kept DARK + translucent (never white lifts — a white fill
      behind a translucent panel bleeds up through it as a whitish tone). Cards
@@ -39,13 +45,29 @@
   --accent: #8fb6ff;
   --accent-soft: rgba(143, 182, 255, 0.16);
   --accent-foreground: #0d0c0b;
+  --terminal-action-size: 15px;
+  --terminal-action-gap: var(--space-2);
+  --terminal-action-search: #32d74b;
+  --terminal-action-minimize: #ffd60a;
+  --terminal-action-close: #ff453a;
+  --canvas-wallpaper-image: url("../../../../assets/themes/canvasWallpapers/canvasWallpaperBlueSea.jpg");
+  /* Canvas scrim, lightened ~10% (alphas ×0.9) so a bit more wallpaper reads. */
+  --canvas-wallpaper-overlay:
+    linear-gradient(180deg, rgba(7, 8, 11, 0.38) 0%, rgba(7, 8, 11, 0.7) 100%),
+    radial-gradient(circle at 50% 38%, rgba(7, 8, 11, 0.07), rgba(7, 8, 11, 0.43) 68%);
+  --canvas-live-wallpaper-opacity: 0.82;
 
-  /* The glass frame tint. Translucent dark so the native vibrancy (blurred
-     desktop) shows through as the "outside", while text stays legible. One tone
-     across toolbar + rails so the surround is a single material. */
-  --glass-frame: rgba(17, 19, 24, 0.55);
-  --glass-rail: rgba(17, 19, 24, 0.55);
-  --glass-toolbar: rgba(17, 19, 24, 0.55);
+  /* The glass frame tint. A dark codex-black tone, mostly opaque so menu text
+     stays crisp — but still translucent enough that the frosted canvas
+     WALLPAPER (via --glass-blur + the full-window .cf-app-wallpaper layer)
+     glows faintly through, NOT the macOS desktop. One tone across toolbar +
+     rails so the surround is a single material. */
+  /* Darkened ~15% (alpha 0.72 → 0.83) so the rails + top bar read a bit solider. */
+  --glass-frame: rgba(19, 17, 16, 0.83);
+  --glass-rail: rgba(19, 17, 16, 0.83);
+  --glass-toolbar: rgba(19, 17, 16, 0.83);
+  /* The frost: blurs the wallpaper showing faintly through the dark frame. */
+  --glass-blur: blur(30px) saturate(135%);
   --glass-pane: rgba(20, 22, 27, 0.86); /* modals/drawers/hub — sit over a scrim */
   --glass-pill: rgba(20, 22, 27, 0.7); /* floating zoom pill */
 
@@ -98,13 +120,74 @@
   transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Transparent to the OUTSIDE: the window (electron/main.ts) provides the macOS
-   "under-window" vibrancy; body must be transparent so the glass frame shows
-   the blurred desktop through it. The opaque canvas is painted only on its own
-   inset rectangle (.canvas-bg), so the desktop never reaches the centre. */
+/* The wallpaper is the OUTSIDE now: a full-window .cf-app-wallpaper layer fills
+   the window behind every piece of chrome, so body stays transparent and the
+   wallpaper (not the desktop) is what the frosted glass frame blurs. */
 html,
 body {
   background: transparent;
+}
+
+/* Full-window wallpaper backdrop. Sits behind ALL chrome and the canvas: the
+   frosted glass frame (toolbar + rails) blurs THIS through backdrop-filter, and
+   the canvas centre shows it directly under the scrim. The dark base behind the
+   (slightly translucent) video keeps the macOS desktop from bleeding through. */
+.cf-app-wallpaper {
+  position: fixed;
+  /* Plain z-index:0 — NO transform. The fix for the wallpaper covering the UI
+     is making the ordering EXPLICIT on both sides: this is z-index:0 and
+     .canvas-bg below is z-index:1, so the GPU compositor can never re-sort the
+     fixed <video> above the canvas content on a recomposite (context menu /
+     empty-state animation). Earlier z-auto vs z-0 was the ambiguity that let it
+     escape; a translateZ promotion made it worse. The chrome (z-40/50) is still
+     above this, so the rails/toolbar backdrop-filter keeps frosting it. */
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: var(--bg);
+}
+
+.canvas-bg {
+  isolation: isolate;
+  /* Explicit z above the wallpaper (z-index:0) so the canvas content always
+     composites in front of it — never lets the fixed <video> escape over the
+     UI. Still well below the chrome (rails z-40 / toolbar z-50). */
+  position: fixed;
+  z-index: 1;
+  /* Transparent: the full-window wallpaper shows through here as the canvas,
+     and the scrim below darkens it for legibility. */
+  background-color: transparent;
+}
+
+.cf-canvas-live-wallpaper,
+.cf-canvas-wallpaper-scrim {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.cf-canvas-live-wallpaper {
+  object-fit: cover;
+  opacity: var(--canvas-live-wallpaper-opacity);
+}
+
+.cf-canvas-wallpaper-scrim {
+  background-image: var(--canvas-wallpaper-overlay);
+}
+
+.canvas-bg > :not(.cf-canvas-wallpaper-scrim) {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-canvas-live-wallpaper {
+    display: none;
+  }
 }
 
 /* The glass frame — one continuous translucent surface. No borders/separators
@@ -112,12 +195,24 @@ body {
    the only tell is a faint top edge line where the frame meets the window. */
 .caspr-rail {
   background-color: var(--glass-rail);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+/* Hover-preview overlay: the panel floats over the canvas (which is NOT inset),
+   so it gets a solid opaque bg + a lift shadow instead of the translucent
+   glass used when pinned. */
+.caspr-rail[data-overlay="true"] {
+  background-color: var(--bg);
+  box-shadow: 0 22px 70px -20px rgba(0, 0, 0, 0.7);
 }
 
 /* Top title bar — same material as the rails; meets them seamlessly at the
    corners. A single faint top edge line is the whole "glass" cue. */
 .caspr-toolbar {
   background-color: var(--glass-toolbar);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: inset 0 1px 0 var(--glass-edge);
 }
 
@@ -297,6 +392,99 @@ body {
 }
 .caspr-dock-item:active {
   filter: brightness(0.92);
+}
+
+/* ── Context menu ──────────────────────────────────────────────────────────────
+   Compact rounded popover (canvas right-click + file-tree menus). A single
+   blurred-glass panel with tight rows; submenus fly out to the side. */
+.caspr-ctx-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  max-width: 260px;
+  padding: 5px;
+  border-radius: 12px;
+  background-color: var(--glass-pane);
+  border: 1px solid var(--glass-edge-soft);
+  box-shadow:
+    inset 0 1px 0 var(--glass-edge),
+    0 16px 44px -14px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+}
+.caspr-ctx-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.1;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 120ms var(--ease-out-soft),
+    color 120ms var(--ease-out-soft);
+}
+.caspr-ctx-item:hover,
+.caspr-ctx-subwrap:hover > .caspr-ctx-item {
+  background-color: var(--surface-hover);
+  color: var(--text-primary);
+}
+.caspr-ctx-item[data-active="true"] {
+  color: var(--accent);
+}
+.caspr-ctx-item[data-danger="true"] {
+  color: var(--red);
+}
+.caspr-ctx-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.caspr-ctx-icon {
+  display: inline-flex;
+  flex: none;
+  opacity: 0.8;
+}
+.caspr-ctx-chevron {
+  flex: none;
+  margin-left: var(--space-2);
+  font-size: 1.15em;
+  line-height: 1;
+  opacity: 0.5;
+}
+.caspr-ctx-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background-color: var(--border);
+}
+.caspr-ctx-subwrap {
+  position: relative;
+}
+/* Flyout opens to the right by default; data-flip swaps it to the left when it
+   would overflow the viewport (so it never spills over the side rails). */
+.caspr-ctx-flyout {
+  position: absolute;
+  top: -5px;
+  left: 100%;
+  padding-left: 4px;
+}
+.caspr-ctx-flyout[data-flip="true"] {
+  left: auto;
+  right: 100%;
+  padding-left: 0;
+  padding-right: 4px;
 }
 
 /* Generic floating glass panel (modals / drawers / hub bodies that opt in). */

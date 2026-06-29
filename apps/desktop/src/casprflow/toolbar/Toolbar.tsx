@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useCanvasStore } from "../stores/canvasStore";
+import { usePanelHoverStore } from "../stores/panelHoverStore";
 import { useThemeStore } from "../stores/themeStore";
 import { useUpdaterStore } from "../stores/updaterStore";
 import { useSettingsModalStore } from "../stores/settingsModalStore";
@@ -27,7 +29,7 @@ const ICON_BUTTON_TRANSITION = {
 } as React.CSSProperties;
 
 const iconButtonClass =
-  "inline-flex h-7 w-7 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-hover)] motion-reduce:transition-none motion-reduce:hover:transform-none";
+  "inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-hover)] motion-reduce:transition-none motion-reduce:hover:transform-none";
 
 export function Toolbar() {
   const { theme, toggleTheme } = useThemeStore();
@@ -39,6 +41,29 @@ export function Toolbar() {
   const openSettings = useSettingsModalStore((s) => s.openSettings);
   const closeSettings = useSettingsModalStore((s) => s.closeSettings);
   const [showUpdate, setShowUpdate] = useState(false);
+
+  // The macOS left gutter is computed in main (it depends on the page zoom +
+  // fullscreen, which the renderer can't see) and pushed here so the left toggle
+  // clears the traffic lights. Collapses in fullscreen (lights hidden). The
+  // lights' VERTICAL alignment is handled natively in main (it moves them onto
+  // the toolbar's centre line), so nothing to do here for that.
+  const [macGutter, setMacGutter] = useState(MAC_STOPLIGHT_GUTTER);
+  useEffect(() => {
+    const unsub = window.casprFlowOS?.app.onToolbarMetrics((m) =>
+      setMacGutter(m.left),
+    );
+    return () => unsub?.();
+  }, []);
+
+  // Panel toggles: pinned = !collapsed. Hovering a toggle previews the panel
+  // (opaque overlay, auto-closing); clicking pins it open (insets the canvas).
+  const leftPinned = useCanvasStore((s) => !s.leftPanelCollapsed);
+  const rightPinned = useCanvasStore((s) => !s.rightPanelCollapsed);
+  const setLeftCollapsed = useCanvasStore((s) => s.setLeftPanelCollapsed);
+  const setRightCollapsed = useCanvasStore((s) => s.setRightPanelCollapsed);
+  const openPreview = usePanelHoverStore((s) => s.openPreview);
+  const closePreviewSoon = usePanelHoverStore((s) => s.closePreviewSoon);
+  const closePreviewNow = usePanelHoverStore((s) => s.closePreviewNow);
 
   const hubOpen = useHubStore((s) => s.open);
   const toggleHub = useHubStore((s) => s.toggleHub);
@@ -55,12 +80,41 @@ export function Toolbar() {
         className="caspr-toolbar fixed top-0 left-0 right-0 z-50 flex h-11 items-center overflow-hidden"
         style={
           {
-            paddingLeft: isMac ? MAC_STOPLIGHT_GUTTER : 16,
+            paddingLeft: isMac ? macGutter : 16,
             paddingRight: isWin ? WIN_CAPTION_GUTTER : 16,
+            // Tiny top padding nudges the whole icon row down ~1.5px so it sits
+            // a touch lower (better optical match with the traffic lights).
+            paddingTop: 3,
             WebkitAppRegion: "drag",
           } as React.CSSProperties
         }
       >
+        {/* Left panel toggle — sits just past the macOS traffic-light gutter. */}
+        <div className="relative z-10 flex shrink-0 items-center" style={noDrag}>
+          <button
+            type="button"
+            className={iconButtonClass}
+            style={{
+              ...ICON_BUTTON_TRANSITION,
+              color: leftPinned ? "var(--text-primary)" : undefined,
+              backgroundColor: leftPinned ? "var(--surface-hover)" : undefined,
+            }}
+            onClick={() => {
+              // Clear the hover-preview so unpinning doesn't immediately re-show
+              // the panel as an overlay just because the cursor is still here.
+              closePreviewNow("left");
+              setLeftCollapsed(leftPinned);
+            }}
+            onMouseEnter={() => openPreview("left")}
+            onMouseLeave={() => closePreviewSoon("left")}
+            title="Toggle left panel"
+            aria-label="Toggle left panel"
+            aria-pressed={leftPinned}
+          >
+            <PanelLeftIcon />
+          </button>
+        </div>
+
         {/* Center column carries the workspace identity. The flex-1
             wrapper lets the title visually center between the platform
             gutters; truncation falls back to ellipsis when the project
@@ -92,6 +146,28 @@ export function Toolbar() {
               onClick={() => setShowUpdate(true)}
             />
           )}
+
+          {/* Right panel toggle — mirror of the left one, top-right cluster. */}
+          <button
+            type="button"
+            className={iconButtonClass}
+            style={{
+              ...ICON_BUTTON_TRANSITION,
+              color: rightPinned ? "var(--text-primary)" : undefined,
+              backgroundColor: rightPinned ? "var(--surface-hover)" : undefined,
+            }}
+            onClick={() => {
+              closePreviewNow("right");
+              setRightCollapsed(rightPinned);
+            }}
+            onMouseEnter={() => openPreview("right")}
+            onMouseLeave={() => closePreviewSoon("right")}
+            title="Toggle right panel"
+            aria-label="Toggle right panel"
+            aria-pressed={rightPinned}
+          >
+            <PanelRightIcon />
+          </button>
 
           <button
             type="button"
@@ -217,12 +293,49 @@ function UpdateStatusButton({
   );
 }
 
+function PanelLeftIcon() {
+  // Rounded window with a divider sectioning off the LEFT column — the macOS
+  // "show left sidebar" mark.
+  return (
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect
+        x="2"
+        y="3"
+        width="12"
+        height="10"
+        rx="2.2"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+      <path d="M6 3.4v9.2" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+function PanelRightIcon() {
+  // Mirror of PanelLeftIcon — divider sections off the RIGHT column.
+  return (
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect
+        x="2"
+        y="3"
+        width="12"
+        height="10"
+        rx="2.2"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+      <path d="M10 3.4v9.2" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
 function HubIcon() {
   // Three rows of stacked bars — a "queue / activity feed" mark, hinting
   // that the surface aggregates many signals into one column. Stroke-only
   // so it inherits the icon button's color tokens.
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none" aria-hidden>
       <path
         d="M2 3.5h10M2 7h7M2 10.5h10"
         stroke="currentColor"
@@ -236,7 +349,7 @@ function HubIcon() {
 
 function SunIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
       <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.4" />
       <path
         d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.93 2.93l1.06 1.06M10.01 10.01l1.06 1.06M2.93 11.07l1.06-1.06M10.01 3.99l1.06-1.06"
@@ -250,7 +363,7 @@ function SunIcon() {
 
 function MoonIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
       <path
         d="M12.5 8.5a5.5 5.5 0 0 1-7-7 5.5 5.5 0 1 0 7 7Z"
         stroke="currentColor"
@@ -263,7 +376,7 @@ function MoonIcon() {
 
 function SettingsIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
       <path
         d="M5.7 1h2.6l.4 1.7a4.5 4.5 0 0 1 1.1.6l1.7-.5 1.3 2.2-1.3 1.2a4.5 4.5 0 0 1 0 1.2l1.3 1.2-1.3 2.3-1.7-.6a4.5 4.5 0 0 1-1.1.7L8.3 13H5.7l-.4-1.7a4.5 4.5 0 0 1-1.1-.7l-1.7.6-1.3-2.3 1.3-1.2a4.5 4.5 0 0 1 0-1.2L1.2 5.3l1.3-2.2 1.7.5a4.5 4.5 0 0 1 1.1-.6L5.7 1Z"
         stroke="currentColor"
@@ -277,7 +390,7 @@ function SettingsIcon() {
 
 function ArrowUpIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
       <path
         d="M7 12V4M4 6.5L7 3.5 10 6.5"
         stroke="currentColor"
@@ -298,8 +411,8 @@ function ArrowUpIcon() {
 function ArrowDownIcon({ className }: { className?: string }) {
   return (
     <svg
-      width="14"
-      height="14"
+      width="20"
+      height="20"
       viewBox="0 0 14 14"
       fill="none"
       className={className}
@@ -323,7 +436,7 @@ function ArrowDownIcon({ className }: { className?: string }) {
 
 function WarningIcon({ style }: { style?: React.CSSProperties }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={style}>
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none" style={style}>
       <path
         d="M7 2L1.5 12h11L7 2Z"
         stroke="currentColor"
@@ -344,8 +457,8 @@ function WarningIcon({ style }: { style?: React.CSSProperties }) {
 function SpinnerIcon({ className }: { className?: string }) {
   return (
     <svg
-      width="14"
-      height="14"
+      width="20"
+      height="20"
       viewBox="0 0 14 14"
       fill="none"
       className={className}
@@ -362,7 +475,7 @@ function SpinnerIcon({ className }: { className?: string }) {
 
 function StarIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
       <path
         d="M7 1l1.76 3.57L12.5 5.27 10.25 8.14l.43 3.86L7 10.73l-3.68 1.27.43-3.86L1.5 5.27l3.74-.7L7 1Z"
         stroke="currentColor"

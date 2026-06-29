@@ -1,13 +1,22 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useT } from "../i18n/useT";
 
 export type MenuItem =
   | {
       type?: "item";
       label: string;
+      icon?: ReactNode;
       active?: boolean;
       danger?: boolean;
-      onClick: () => void;
+      // A submenu opens to the side on hover. When present, onClick is optional.
+      submenu?: MenuItem[];
+      onClick?: () => void;
     }
   | { type: "separator" };
 
@@ -20,6 +29,12 @@ interface Props {
 
 const VIEWPORT_MARGIN = 8;
 
+/**
+ * Compact rounded context menu. A single flat list with optional one-level
+ * submenus that fly out on hover (used by the canvas right-click "Add Agent").
+ * Portal the whole thing at the call site so it sits in the root stacking
+ * context, above the canvas/wallpaper.
+ */
 export function ContextMenu({ x, y, items, onClose }: Props) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
@@ -63,80 +78,109 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  // Focus first menu item on mount
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    const first = node.querySelector<HTMLElement>("[role='menuitem']");
-    if (first) {
-      requestAnimationFrame(() => first.focus());
-    }
-  }, []);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const node = ref.current;
-    if (!node) return;
-    const menuitems = Array.from(
-      node.querySelectorAll<HTMLElement>("[role='menuitem']"),
-    );
-    const active = document.activeElement as HTMLElement | null;
-    const idx = active ? menuitems.indexOf(active) : -1;
-
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      const next = menuitems[(idx + 1) % menuitems.length];
-      next?.focus();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      const prev = menuitems[(idx - 1 + menuitems.length) % menuitems.length];
-      prev?.focus();
-    } else if (e.key === "Home") {
-      e.preventDefault();
-      menuitems[0]?.focus();
-    } else if (e.key === "End") {
-      e.preventDefault();
-      menuitems[menuitems.length - 1]?.focus();
-    }
-  };
-
   return (
     <div
       ref={ref}
       role="menu"
       aria-label={t.context_menu_aria_label}
-      className="fixed z-[100] py-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-lg min-w-[140px]"
+      className="caspr-ctx fixed z-[1000]"
       style={{ left: pos.x, top: pos.y }}
-      onKeyDown={handleKeyDown}
     >
+      <MenuList items={items} onClose={onClose} />
+    </div>
+  );
+}
+
+function MenuList({
+  items,
+  onClose,
+}: {
+  items: MenuItem[];
+  onClose: () => void;
+}) {
+  const [openSub, setOpenSub] = useState<number | null>(null);
+
+  return (
+    <div className="caspr-ctx-panel" role="presentation">
       {items.map((item, i) =>
         item.type === "separator" ? (
+          <div key={`sep-${i}`} role="separator" className="caspr-ctx-sep" />
+        ) : item.submenu ? (
           <div
-            key={`sep-${i}`}
-            role="separator"
-            className="my-1 border-t border-[var(--border)]"
-          />
+            key={`${item.label}-${i}`}
+            className="caspr-ctx-subwrap"
+            onMouseEnter={() => setOpenSub(i)}
+            onMouseLeave={() => setOpenSub((cur) => (cur === i ? null : cur))}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={openSub === i}
+              className="caspr-ctx-item"
+              data-has-sub="true"
+            >
+              <span className="caspr-ctx-label">
+                {item.icon && <span className="caspr-ctx-icon">{item.icon}</span>}
+                {item.label}
+              </span>
+              <span aria-hidden className="caspr-ctx-chevron">
+                ›
+              </span>
+            </button>
+            {openSub === i && (
+              <SubmenuFlyout items={item.submenu} onClose={onClose} />
+            )}
+          </div>
         ) : (
           <button
             key={`${item.label}-${i}`}
+            type="button"
             role="menuitem"
-            tabIndex={-1}
-            className={`w-full px-3 py-1.5 text-left text-[12px] transition-colors duration-quick ${
-              item.active
-                ? "text-[var(--accent)] bg-[var(--accent)]/10"
-                : item.danger
-                  ? "text-[var(--red)] hover:text-[var(--red-soft)] hover:bg-[var(--border)]"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--border)]"
-            }`}
-            style={{ fontFamily: '"Geist Mono", monospace' }}
+            className="caspr-ctx-item"
+            data-active={item.active ? "true" : undefined}
+            data-danger={item.danger ? "true" : undefined}
             onClick={() => {
-              item.onClick();
+              item.onClick?.();
               onClose();
             }}
           >
-            {item.label}
+            <span className="caspr-ctx-label">
+              {item.icon && <span className="caspr-ctx-icon">{item.icon}</span>}
+              {item.label}
+            </span>
           </button>
         ),
       )}
+    </div>
+  );
+}
+
+/** Submenu that opens to the right, flipping left if it would overflow. */
+function SubmenuFlyout({
+  items,
+  onClose,
+}: {
+  items: MenuItem[];
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [flip, setFlip] = useState(false);
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    if (rect.right > window.innerWidth - VIEWPORT_MARGIN) setFlip(true);
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className="caspr-ctx-flyout"
+      data-flip={flip ? "true" : undefined}
+    >
+      <MenuList items={items} onClose={onClose} />
     </div>
   );
 }
